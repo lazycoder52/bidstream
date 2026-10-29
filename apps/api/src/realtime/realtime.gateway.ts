@@ -8,11 +8,12 @@ import {
   ConnectedSocket,
   MessageBody,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
+import { Logger, Optional } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { MetricsService } from '../metrics/metrics.service.js';
 import {
   BidPlacedEvent,
   OutbidNoticeEvent,
@@ -44,6 +45,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @Optional() private readonly metricsService?: MetricsService,
   ) {}
 
   afterInit(): void {
@@ -74,10 +76,15 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       // Unauthenticated client can still observe public auctions
       this.logger.debug(`Client ${client.id} connected anonymously or token invalid`);
     }
+
+    const count = this.server?.engine?.clientsCount ?? 0;
+    this.metricsService?.setActiveSocketConnections(count);
   }
 
   handleDisconnect(client: Socket): void {
     this.logger.debug(`Client ${client.id} disconnected`);
+    const count = (this.server?.engine?.clientsCount ?? 1) - 1;
+    this.metricsService?.setActiveSocketConnections(Math.max(0, count));
   }
 
   @SubscribeMessage('auction:join')

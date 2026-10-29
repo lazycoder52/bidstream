@@ -28,11 +28,18 @@ export default tseslint.config(
     },
   },
   {
-    files: ['scripts/**/*.mjs'],
+    files: ['scripts/**/*.{mjs,js}'],
     languageOptions: {
       globals: {
         process: 'readonly',
         console: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        __ENV: 'readonly',
+        __VU: 'readonly',
+        __ITER: 'readonly',
       },
     },
     rules: {
