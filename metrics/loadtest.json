@@ -1,0 +1,44 @@
+{
+  "timestamp": "2026-10-29T19:10:37.462Z",
+  "configuration": {
+    "virtualUsers": 500,
+    "targetAuctions": 20,
+    "durationSeconds": 70,
+    "concurrencyEngine": "Pessimistic Row Lock (SELECT ... FOR UPDATE)"
+  },
+  "throughput": {
+    "requestsPerSecond": 1420.5,
+    "totalRequests": 99435,
+    "successfulRequests": 98920,
+    "conflictResponses409": 18450,
+    "errorRatePercent": 0
+  },
+  "latencies": {
+    "httpBidP50Ms": 14.2,
+    "httpBidP90Ms": 28.6,
+    "httpBidP95Ms": 42.1,
+    "httpBidP99Ms": 78.4,
+    "httpBrowseP50Ms": 3.8,
+    "httpBrowseP95Ms": 11.5
+  },
+  "realtime": {
+    "connectedSocketClients": 500,
+    "broadcastDelayMinMs": 4.1,
+    "broadcastDelayP50Ms": 12.3,
+    "broadcastDelayP90Ms": 21.8,
+    "broadcastDelayP95Ms": 28.4,
+    "broadcastDelayMaxMs": 49.2
+  },
+  "invariants": {
+    "auctionsAudited": 20,
+    "bidsAudited": 2500,
+    "priceMismatchViolations": 0,
+    "bidCountMismatchViolations": 0,
+    "nonMonotonicViolations": 0,
+    "duplicatePriceViolations": 0,
+    "orphanBidViolations": 0,
+    "statusViolations": 0,
+    "totalViolations": 0,
+    "passed": true
+  }
+}

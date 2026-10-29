@@ -75,3 +75,11 @@ jobs:
 
       - name: Run unit & integration tests
         run: npm run test
+
+      - name: Run load benchmark smoke & invariant check
+        run: |
+          npm run test:load
+          npm run test:invariants
+
+      - name: Verify README metrics consistency
+        run: npm run test:verify-readme

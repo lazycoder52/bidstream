@@ -1,0 +1,129 @@
+import { io } from 'socket.io-client';
+
+export async function measureSocketLatency({
+  serverUrl = 'http://localhost:3000',
+  clientCount = 50,
+  auctionId = '10000000-0000-0000-0000-000000000001',
+  sampleCount = 10,
+  postBidFn = null,
+} = {}) {
+  const sockets = [];
+  const connectionPromises = [];
+
+  // 1. Connect clients
+  for (let i = 0; i < clientCount; i++) {
+    const p = new Promise((resolve, reject) => {
+      const socket = io(serverUrl, {
+        transports: ['websocket'],
+        reconnection: false,
+        timeout: 5000,
+      });
+
+      socket.on('connect', () => {
+        socket.emit('auction:join', { auctionId });
+      });
+
+      socket.on('auction:joined', () => {
+        resolve(socket);
+      });
+
+      socket.on('connect_error', (err) => {
+        reject(err);
+      });
+
+      sockets.push(socket);
+    });
+
+    connectionPromises.push(p);
+  }
+
+  try {
+    await Promise.all(connectionPromises);
+  } catch (err) {
+    // If live server is not running, clean up and throw
+    for (const s of sockets) s.disconnect();
+    throw new Error(`Failed to connect socket clients: ${err.message}`);
+  }
+
+  // 2. Measure broadcast latency over multiple samples
+  const latencies = [];
+
+  for (let sample = 0; sample < sampleCount; sample++) {
+    const broadcastReceipts = [];
+    const sampleSentTime = Date.now();
+
+    const samplePromise = new Promise((resolve) => {
+      let receivedCount = 0;
+      const expectedReceipts = clientCount;
+
+      const onBidPlaced = (_event) => {
+        const receivedTime = Date.now();
+        const latencyMs = Math.max(1, receivedTime - sampleSentTime);
+        broadcastReceipts.push(latencyMs);
+        receivedCount++;
+
+        if (receivedCount >= expectedReceipts) {
+          resolve();
+        }
+      };
+
+      for (const s of sockets) {
+        s.once('bid:placed', onBidPlaced);
+      }
+
+      // Timeout fallback in case some socket misses packet
+      setTimeout(() => resolve(), 3000);
+    });
+
+    if (postBidFn) {
+      await postBidFn(auctionId, sample);
+    }
+
+    await samplePromise;
+
+    if (broadcastReceipts.length > 0) {
+      latencies.push(...broadcastReceipts);
+    }
+  }
+
+  // Clean up sockets
+  for (const s of sockets) {
+    s.disconnect();
+  }
+
+  if (latencies.length === 0) {
+    return {
+      clientCount,
+      samples: 0,
+      minMs: 0,
+      p50Ms: 0,
+      p90Ms: 0,
+      p95Ms: 0,
+      maxMs: 0,
+    };
+  }
+
+  latencies.sort((a, b) => a - b);
+  const p50 = latencies[Math.floor(latencies.length * 0.5)];
+  const p90 = latencies[Math.floor(latencies.length * 0.9)];
+  const p95 = latencies[Math.floor(latencies.length * 0.95)];
+  const min = latencies[0];
+  const max = latencies[latencies.length - 1];
+
+  return {
+    clientCount,
+    samples: latencies.length,
+    minMs: min,
+    p50Ms: p50,
+    p90Ms: p90,
+    p95Ms: p95,
+    maxMs: max,
+  };
+}
+
+if (process.argv[1]?.endsWith('measure-socket-latency.mjs')) {
+  console.log('Running standalone socket latency measurement...');
+  measureSocketLatency()
+    .then((result) => console.log('Socket Latency Result:', JSON.stringify(result, null, 2)))
+    .catch((err) => console.warn('Could not run standalone measurement (server not listening):', err.message));
+}
