@@ -51,17 +51,34 @@ export const TimeSyncResponseSchema = z.object({
 
 export type TimeSyncResponse = z.infer<typeof TimeSyncResponseSchema>;
 
+export const AuctionJoinSchema = z.object({
+  auctionId: z.string().uuid(),
+  lastBidId: z.string().uuid().optional(),
+});
+
+export type AuctionJoinPayload = z.infer<typeof AuctionJoinSchema>;
+
+export const AuctionLeaveSchema = z.object({
+  auctionId: z.string().uuid(),
+});
+
+export type AuctionLeavePayload = z.infer<typeof AuctionLeaveSchema>;
+
 export interface ServerToClientEvents {
   'bid:placed': (event: BidPlacedEvent) => void;
   'bid:outbid': (event: OutbidNoticeEvent) => void;
   'auction:extended': (event: AuctionExtendedEvent) => void;
   'auction:closed': (event: AuctionClosedEvent) => void;
   'time:sync:response': (event: TimeSyncResponse) => void;
+  'auction:joined': (payload: { auctionId: string; replayedCount: number }) => void;
   error: (error: { message: string }) => void;
 }
 
 export interface ClientToServerEvents {
-  'auction:join': (payload: { auctionId: string; lastBidId?: string }) => void;
-  'auction:leave': (payload: { auctionId: string }) => void;
+  'auction:join': (
+    payload: AuctionJoinPayload,
+    callback?: (response: { status: 'ok'; replayedCount: number }) => void,
+  ) => void;
+  'auction:leave': (payload: AuctionLeavePayload) => void;
   'time:sync:request': (payload: TimeSyncRequest) => void;
 }
