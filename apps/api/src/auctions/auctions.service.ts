@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { LifecycleService } from '../lifecycle/lifecycle.service.js';
 import { CreateAuctionDto } from './dto/create-auction.dto.js';
 import { UpdateAuctionDto } from './dto/update-auction.dto.js';
 import { AuctionListQueryDto } from './dto/auction-list-query.dto.js';
@@ -33,7 +34,10 @@ interface AuctionWithRelations {
 
 @Injectable()
 export class AuctionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly lifecycleService: LifecycleService,
+  ) {}
 
   async create(sellerId: string, dto: CreateAuctionDto): Promise<AuctionDto> {
     const startTime = new Date(dto.startTime);
@@ -63,6 +67,10 @@ export class AuctionsService {
         seller: { select: { name: true } },
       },
     });
+
+    if (initialStatus === 'ACTIVE') {
+      await this.lifecycleService.scheduleAuctionClose(auction.id, auction.endTime);
+    }
 
     return this.mapToDto(auction);
   }
