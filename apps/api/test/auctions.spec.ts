@@ -87,51 +87,51 @@ describe('Auctions Module (Integration)', () => {
       }),
     },
     auction: {
-      create: jest
-        .fn()
-        .mockImplementation(
-          ({
-            data,
-          }: {
-            data: {
-              title: string;
-              description: string;
-              startingPrice: number;
-              currentPrice: number;
-              reservePrice?: number | null;
-              minIncrement: number;
-              status: 'DRAFT' | 'ACTIVE';
-              sellerId: string;
-              startTime: Date;
-              endTime: Date;
-            };
-          }) => {
-            const id = '44444444-5555-6666-7777-888888888888';
-            const record: MockAuctionRecord = {
-              id,
-              title: data.title,
-              description: data.description,
-              startingPrice: data.startingPrice,
-              currentPrice: data.currentPrice,
-              reservePrice: data.reservePrice ?? null,
-              minIncrement: data.minIncrement,
-              status: data.status,
-              sellerId: data.sellerId,
-              winnerId: null,
-              bidCount: 0,
-              startTime: data.startTime,
-              endTime: data.endTime,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              seller: { name: 'Seller User' },
-              winner: null,
-            };
-            mockAuctions.set(id, record);
-            return Promise.resolve(record);
-          },
-        ),
+      create: jest.fn().mockImplementation(
+        ({
+          data,
+        }: {
+          data: {
+            title: string;
+            description: string;
+            startingPrice: number;
+            currentPrice: number;
+            reservePrice?: number | null;
+            minIncrement: number;
+            status: 'DRAFT' | 'ACTIVE';
+            sellerId: string;
+            startTime: Date;
+            endTime: Date;
+          };
+        }) => {
+          const id = '44444444-5555-6666-7777-888888888888';
+          const record: MockAuctionRecord = {
+            id,
+            title: data.title,
+            description: data.description,
+            startingPrice: data.startingPrice,
+            currentPrice: data.currentPrice,
+            reservePrice: data.reservePrice ?? null,
+            minIncrement: data.minIncrement,
+            status: data.status,
+            sellerId: data.sellerId,
+            winnerId: null,
+            bidCount: 0,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            seller: { name: 'Seller User' },
+            winner: null,
+          };
+          mockAuctions.set(id, record);
+          return Promise.resolve(record);
+        },
+      ),
       count: jest.fn().mockImplementation(() => Promise.resolve(mockAuctions.size)),
-      findMany: jest.fn().mockImplementation(() => Promise.resolve(Array.from(mockAuctions.values()))),
+      findMany: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(Array.from(mockAuctions.values()))),
       findUnique: jest.fn().mockImplementation(({ where }: { where: { id: string } }) => {
         return Promise.resolve(mockAuctions.get(where.id) || null);
       }),
@@ -147,7 +147,10 @@ describe('Auctions Module (Integration)', () => {
     multi: jest.fn().mockReturnValue({
       incr: jest.fn().mockReturnThis(),
       pttl: jest.fn().mockReturnThis(),
-      exec: jest.fn().mockResolvedValue([[null, 1], [null, 60000]]),
+      exec: jest.fn().mockResolvedValue([
+        [null, 1],
+        [null, 60000],
+      ]),
     }),
     pexpire: jest.fn().mockResolvedValue(1),
   };
@@ -241,9 +244,7 @@ describe('Auctions Module (Integration)', () => {
   });
 
   it('GET /auctions - lists auctions with pagination envelope', async () => {
-    const res = await request(app.getHttpServer())
-      .get('/auctions?page=1&limit=10')
-      .expect(200);
+    const res = await request(app.getHttpServer()).get('/auctions?page=1&limit=10').expect(200);
 
     expect(res.body.success).toBe(true);
     expect(res.body.data.items).toHaveLength(1);

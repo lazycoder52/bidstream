@@ -67,11 +67,7 @@ describe('Lifecycle & Closing Engine (Unit/Integration)', () => {
       update: jest
         .fn()
         .mockImplementation(
-          ({
-            data,
-          }: {
-            data: { status?: 'ACTIVE' | 'ENDED'; winnerId?: string | null };
-          }) => {
+          ({ data }: { data: { status?: 'ACTIVE' | 'ENDED'; winnerId?: string | null } }) => {
             if (data.status) mockAuction.status = data.status;
             if (data.winnerId !== undefined) mockAuction.winnerId = data.winnerId;
             return Promise.resolve(mockAuction);
