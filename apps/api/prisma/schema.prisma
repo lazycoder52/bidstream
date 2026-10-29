@@ -1,0 +1,93 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+enum AuctionStatus {
+  DRAFT
+  ACTIVE
+  ENDED
+  CANCELLED
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @map("password_hash")
+  name         String    @db.VarChar(100)
+  role         UserRole  @default(BUYER)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  auctions     Auction[] @relation("SellerAuctions")
+  wonAuctions  Auction[] @relation("WinnerAuctions")
+  bids         Bid[]
+
+  @@map("users")
+}
+
+model Auction {
+  id            String        @id @default(uuid()) @db.Uuid
+  title         String        @db.VarChar(120)
+  description   String        @db.Text
+  startingPrice Float         @map("starting_price")
+  currentPrice  Float         @map("current_price")
+  reservePrice  Float?        @map("reserve_price")
+  minIncrement  Float         @default(1.0) @map("min_increment")
+  status        AuctionStatus @default(DRAFT)
+  sellerId      String        @map("seller_id") @db.Uuid
+  winnerId      String?       @map("winner_id") @db.Uuid
+  bidCount      Int           @default(0) @map("bid_count")
+  startTime     DateTime      @map("start_time")
+  endTime       DateTime      @map("end_time")
+  version       Int           @default(1)
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  seller        User          @relation("SellerAuctions", fields: [sellerId], references: [id], onDelete: Cascade)
+  winner        User?         @relation("WinnerAuctions", fields: [winnerId], references: [id], onDelete: SetNull)
+  bids          Bid[]
+
+  @@index([status, endTime])
+  @@index([sellerId])
+  @@map("auctions")
+}
+
+model Bid {
+  id        String   @id @default(uuid()) @db.Uuid
+  auctionId String   @map("auction_id") @db.Uuid
+  bidderId  String   @map("bidder_id") @db.Uuid
+  amount    Float
+  createdAt DateTime @default(now()) @map("created_at")
+
+  auction   Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  bidder    User     @relation(fields: [bidderId], references: [id], onDelete: Cascade)
+
+  @@index([auctionId, createdAt])
+  @@index([bidderId])
+  @@map("bids")
+}
+
+model IdempotencyKey {
+  id             String   @id @default(uuid()) @db.Uuid
+  key            String   @unique @db.VarChar(255)
+  target         String   @db.VarChar(255)
+  responseStatus Int      @map("response_status")
+  responseBody   Json     @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at")
+  expiresAt      DateTime @map("expires_at")
+
+  @@index([key, expiresAt])
+  @@map("idempotency_keys")
+}
+
