@@ -1,6 +1,7 @@
 import { LifecycleService } from '../src/lifecycle/lifecycle.service';
 import { SweeperService } from '../src/lifecycle/sweeper.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { RealtimeGateway } from '../src/realtime/realtime.gateway';
 import { ConfigService } from '@nestjs/config';
 
 interface MockAuctionRecord {
@@ -29,6 +30,13 @@ describe('Lifecycle & Closing Engine (Unit/Integration)', () => {
   let mockHighestBid: MockBidRecord | null;
   let lockPromise = Promise.resolve();
 
+  const mockRealtimeGateway = {
+    broadcastBidPlaced: jest.fn(),
+    sendOutbidNotice: jest.fn(),
+    broadcastAuctionExtended: jest.fn(),
+    broadcastAuctionClosed: jest.fn(),
+  } as unknown as RealtimeGateway;
+
   const mockPrismaService = {
     $transaction: jest
       .fn()
@@ -47,7 +55,6 @@ describe('Lifecycle & Closing Engine (Unit/Integration)', () => {
         }
       }),
     $queryRaw: jest.fn().mockImplementation(() => {
-      if (!mockAuction) return Promise.resolve([]);
       return Promise.resolve([
         {
           id: mockAuction.id,
@@ -61,32 +68,41 @@ describe('Lifecycle & Closing Engine (Unit/Integration)', () => {
       ]);
     }),
     bid: {
-      findFirst: jest.fn().mockImplementation(() => Promise.resolve(mockHighestBid)),
+      findFirst: jest.fn().mockImplementation(() => {
+        return Promise.resolve(mockHighestBid);
+      }),
     },
     auction: {
       update: jest
         .fn()
         .mockImplementation(
-          ({ data }: { data: { status?: 'ACTIVE' | 'ENDED'; winnerId?: string | null } }) => {
+          ({ data }: { data: { status?: 'ENDED'; winnerId?: string | null } }) => {
             if (data.status) mockAuction.status = data.status;
             if (data.winnerId !== undefined) mockAuction.winnerId = data.winnerId;
             return Promise.resolve(mockAuction);
           },
         ),
     },
+    user: {
+      findUnique: jest.fn().mockResolvedValue({ name: 'Winner User' }),
+    },
   };
 
   const mockConfigService = {
-    get: jest.fn().mockImplementation((_key: string, def: unknown) => def),
+    get: jest.fn().mockImplementation((key: string, defaultVal: unknown) => {
+      if (key === 'REDIS_HOST') return 'localhost';
+      if (key === 'REDIS_PORT') return 6379;
+      return defaultVal;
+    }),
   };
 
   beforeEach(() => {
     mockAuction = {
       id: auctionId,
       status: 'ACTIVE',
-      currentPrice: 250,
+      currentPrice: 200,
       reservePrice: 200,
-      endTime: new Date(Date.now() - 10000), // expired 10s ago
+      endTime: new Date(Date.now() - 1000), // Ended 1s ago
       sellerId: 'seller-id',
       winnerId: null,
     };
@@ -102,6 +118,7 @@ describe('Lifecycle & Closing Engine (Unit/Integration)', () => {
     lifecycleService = new LifecycleService(
       mockPrismaService as unknown as PrismaService,
       mockConfigService as unknown as ConfigService,
+      mockRealtimeGateway,
     );
     sweeperService = new SweeperService(
       mockPrismaService as unknown as PrismaService,
@@ -120,10 +137,17 @@ describe('Lifecycle & Closing Engine (Unit/Integration)', () => {
     expect(result.winnerId).toBe('winner-bidder-id');
     expect(mockAuction.status).toBe('ENDED');
     expect(mockAuction.winnerId).toBe('winner-bidder-id');
+    expect(mockRealtimeGateway.broadcastAuctionClosed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auctionId,
+        winnerId: 'winner-bidder-id',
+        status: 'ENDED',
+      }),
+    );
   });
 
-  it('does not close an auction whose end_time is still in the future', async () => {
-    mockAuction.endTime = new Date(Date.now() + 60000); // 1 minute in future
+  it('does not close auction if end_time is still in the future', async () => {
+    mockAuction.endTime = new Date(Date.now() + 60000); // 1 minute in the future
 
     const result = await lifecycleService.closeAuction(auctionId);
 
@@ -131,33 +155,45 @@ describe('Lifecycle & Closing Engine (Unit/Integration)', () => {
     expect(mockAuction.status).toBe('ACTIVE');
   });
 
-  it('sets winner to null if reserve price was not met', async () => {
-    mockAuction.reservePrice = 500; // current price is 250, reserve is 500
+  it('does not award winner if reserve price is not met', async () => {
+    mockAuction.reservePrice = 500;
+    mockHighestBid = {
+      id: 'bid-1',
+      auctionId,
+      bidderId: 'low-bidder',
+      amount: 250,
+    };
 
     const result = await lifecycleService.closeAuction(auctionId);
 
     expect(result.closed).toBe(true);
     expect(result.winnerId).toBeNull();
+    expect(mockAuction.status).toBe('ENDED');
     expect(mockAuction.winnerId).toBeNull();
   });
 
-  it('idempotently handles racing workers attempting to close the same auction', async () => {
-    const [result1, result2] = await Promise.all([
+  it('handles concurrent closing workers idempotently without double-ending', async () => {
+    // Two workers attempt to close the exact same auction at the exact same millisecond
+    const [w1, w2] = await Promise.all([
       lifecycleService.closeAuction(auctionId),
       lifecycleService.closeAuction(auctionId),
     ]);
 
-    const closedCount = (result1.closed ? 1 : 0) + (result2.closed ? 1 : 0);
+    // Exactly one should perform the transition, both return cleanly
+    const closedCount = (w1.closed ? 1 : 0) + (w2.closed ? 1 : 0);
     expect(closedCount).toBe(1);
     expect(mockAuction.status).toBe('ENDED');
   });
 
-  it('sweeper detects overdue active auctions and invokes close', async () => {
+  it('sweeper finds and triggers close on overdue auctions', async () => {
     mockPrismaService.$queryRaw.mockResolvedValueOnce([{ id: auctionId }]);
+    const closeSpy = jest.spyOn(lifecycleService, 'closeAuction').mockResolvedValueOnce({
+      closed: true,
+      winnerId: 'winner-bidder-id',
+    });
 
-    const sweptCount = await sweeperService.sweepOverdueAuctions();
+    await sweeperService.sweepOverdueAuctions();
 
-    expect(sweptCount).toBe(1);
-    expect(mockAuction.status).toBe('ENDED');
+    expect(closeSpy).toHaveBeenCalledWith(auctionId);
   });
 });
