@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import { ZodValidationPipe } from 'nestjs-zod';
@@ -6,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
+import { RedisIoAdapter } from './realtime/redis-io.adapter.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -24,6 +26,14 @@ async function bootstrap() {
 
   app.useGlobalPipes(new ZodValidationPipe());
   app.useGlobalFilters(new HttpExceptionFilter());
+
+  // WebSocket Redis Adapter for multi-instance scaling
+  const configService = app.get(ConfigService);
+  const redisIoAdapter = new RedisIoAdapter(app);
+  const redisHost = configService.get<string>('REDIS_HOST', 'localhost');
+  const redisPort = configService.get<number>('REDIS_PORT', 6379);
+  await redisIoAdapter.connectToRedis(redisHost, redisPort);
+  app.useWebSocketAdapter(redisIoAdapter);
 
   // Swagger OpenAPI Documentation
   const swaggerConfig = new DocumentBuilder()

@@ -8,6 +8,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LifecycleService } from '../lifecycle/lifecycle.service.js';
+import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { PlaceBidDto } from './dto/place-bid.dto.js';
 import { BidDto, PlaceBidResult } from '@bidstream/contracts';
 
@@ -23,6 +24,13 @@ interface LockedAuction {
   version: number;
 }
 
+interface BidTxResult {
+  bidResult: PlaceBidResult;
+  isNewBid: boolean;
+  previousHighestBidderId: string | null;
+  previousPrice: number;
+}
+
 @Injectable()
 export class BidsService {
   private readonly antiSnipingWindowMs = 60 * 1000; // 60 seconds
@@ -31,6 +39,7 @@ export class BidsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly lifecycleService: LifecycleService,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
   async placeBid(
@@ -53,7 +62,7 @@ export class BidsService {
     let extensionEndTime: Date | null = null;
 
     // 2. Execute single atomic transaction with row-level pessimistic locking
-    const result = await this.prisma.$transaction(
+    const txResult: BidTxResult = await this.prisma.$transaction(
       async (tx) => {
         // Double-check idempotency key inside transaction
         if (idempotencyKey) {
@@ -61,7 +70,12 @@ export class BidsService {
             where: { key: idempotencyKey },
           });
           if (existingInTx && existingInTx.expiresAt > new Date()) {
-            return existingInTx.responseBody as unknown as PlaceBidResult;
+            return {
+              bidResult: existingInTx.responseBody as unknown as PlaceBidResult,
+              isNewBid: false,
+              previousHighestBidderId: null,
+              previousPrice: 0,
+            };
           }
         }
 
@@ -101,6 +115,9 @@ export class BidsService {
             `Bid amount ${dto.amount} is below the minimum required amount of ${minRequired}`,
           );
         }
+
+        const previousHighestBidderId = auction.winner_id;
+        const previousPrice = Number(auction.current_price);
 
         // Anti-sniping dynamic extension
         const remainingTimeMs = auction.end_time.getTime() - now.getTime();
@@ -166,7 +183,12 @@ export class BidsService {
           });
         }
 
-        return bidResult;
+        return {
+          bidResult,
+          isNewBid: true,
+          previousHighestBidderId,
+          previousPrice,
+        };
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
@@ -178,7 +200,34 @@ export class BidsService {
       await this.lifecycleService.rescheduleAuctionClose(auctionId, extensionEndTime);
     }
 
-    return result;
+    // 4. Real-time broadcast
+    if (txResult.isNewBid) {
+      this.realtimeGateway.broadcastBidPlaced({
+        auctionId,
+        bid: txResult.bidResult.bid,
+        currentPrice: txResult.bidResult.currentPrice,
+        bidCount: txResult.bidResult.bidCount,
+        endTime: txResult.bidResult.endTime,
+      });
+
+      if (txResult.previousHighestBidderId && txResult.previousHighestBidderId !== bidderId) {
+        this.realtimeGateway.sendOutbidNotice(txResult.previousHighestBidderId, {
+          auctionId,
+          previousBid: txResult.previousPrice,
+          newPrice: txResult.bidResult.currentPrice,
+        });
+      }
+
+      if (txResult.bidResult.extended) {
+        this.realtimeGateway.broadcastAuctionExtended({
+          auctionId,
+          newEndTime: txResult.bidResult.endTime,
+          reason: 'ANTI_SNIPING',
+        });
+      }
+    }
+
+    return txResult.bidResult;
   }
 
   async getBidHistory(auctionId: string, limit = 50): Promise<BidDto[]> {

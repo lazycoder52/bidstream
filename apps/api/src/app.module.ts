@@ -12,6 +12,7 @@ import { UsersModule } from './users/users.module.js';
 import { AuctionsModule } from './auctions/auctions.module.js';
 import { BidsModule } from './bids/bids.module.js';
 import { LifecycleModule } from './lifecycle/lifecycle.module.js';
+import { RealtimeModule } from './realtime/realtime.module.js';
 import { AppController } from './app.controller.js';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
@@ -50,6 +51,7 @@ import { RedisThrottlerStorage } from './common/throttler/redis-throttler.storag
     AuctionsModule,
     LifecycleModule,
     BidsModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [
