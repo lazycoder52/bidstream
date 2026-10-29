@@ -116,7 +116,9 @@ export class AuctionsService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      items: items.map((item) => this.mapToDto(item)),
+      items: (items as AuctionWithRelations[]).map((item: AuctionWithRelations) =>
+        this.mapToDto(item),
+      ),
       total,
       page,
       limit,

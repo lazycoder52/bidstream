@@ -58,6 +58,9 @@ jobs:
       - name: Build contracts package
         run: npm run build:contracts
 
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
       - name: Lint check
         run: npm run lint
 
@@ -67,9 +70,5 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Generate Prisma client
-        run: npm run prisma:generate
-
       - name: Run unit & integration tests
         run: npm run test
-
