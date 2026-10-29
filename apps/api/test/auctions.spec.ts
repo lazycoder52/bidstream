@@ -6,6 +6,7 @@ import { ZodValidationPipe } from 'nestjs-zod';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
+import { LifecycleService } from '../src/lifecycle/lifecycle.service';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { JwtService } from '@nestjs/jwt';
 
@@ -160,6 +161,12 @@ describe('Auctions Module (Integration)', () => {
     onModuleDestroy: jest.fn(),
   };
 
+  const mockLifecycleService = {
+    scheduleAuctionClose: jest.fn().mockResolvedValue(undefined),
+    rescheduleAuctionClose: jest.fn().mockResolvedValue(undefined),
+    closeAuction: jest.fn().mockResolvedValue({ closed: true, winnerId: null }),
+  };
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -168,6 +175,8 @@ describe('Auctions Module (Integration)', () => {
       .useValue(mockPrismaService)
       .overrideProvider(RedisService)
       .useValue(mockRedisService)
+      .overrideProvider(LifecycleService)
+      .useValue(mockLifecycleService)
       .compile();
 
     app = moduleFixture.createNestApplication();
