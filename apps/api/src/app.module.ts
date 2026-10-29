@@ -1,6 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { validateEnv } from './config/env.validation.js';
@@ -13,6 +13,8 @@ import { AuctionsModule } from './auctions/auctions.module.js';
 import { BidsModule } from './bids/bids.module.js';
 import { LifecycleModule } from './lifecycle/lifecycle.module.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
+import { MetricsModule } from './metrics/metrics.module.js';
+import { MetricsInterceptor } from './metrics/metrics.interceptor.js';
 import { AppController } from './app.controller.js';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
@@ -46,6 +48,7 @@ import { RedisThrottlerStorage } from './common/throttler/redis-throttler.storag
     }),
     PrismaModule,
     RedisModule,
+    MetricsModule,
     UsersModule,
     AuthModule,
     AuctionsModule,
@@ -55,6 +58,10 @@ import { RedisThrottlerStorage } from './common/throttler/redis-throttler.storag
   ],
   controllers: [AppController],
   providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: MetricsInterceptor,
+    },
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
