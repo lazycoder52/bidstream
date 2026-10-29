@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 
 export interface AuctionClosePayload {
   auctionId: string;
@@ -25,6 +26,7 @@ export class LifecycleService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
   onModuleInit() {
@@ -78,7 +80,7 @@ export class LifecycleService implements OnModuleInit, OnModuleDestroy {
   }
 
   async closeAuction(auctionId: string): Promise<{ closed: boolean; winnerId: string | null }> {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<LockedAuctionRow[]>`
         SELECT id, status, current_price, reserve_price, end_time, seller_id, winner_id
         FROM auctions
@@ -88,17 +90,25 @@ export class LifecycleService implements OnModuleInit, OnModuleDestroy {
 
       const auction = rows[0];
       if (!auction) {
-        return { closed: false, winnerId: null };
+        return { closed: false, winnerId: null, finalPrice: 0 };
       }
 
       if (auction.status !== 'ACTIVE') {
-        return { closed: false, winnerId: auction.winner_id };
+        return {
+          closed: false,
+          winnerId: auction.winner_id,
+          finalPrice: Number(auction.current_price),
+        };
       }
 
       const now = new Date();
       if (now < auction.end_time) {
         // Auction was extended and end_time is in the future
-        return { closed: false, winnerId: auction.winner_id };
+        return {
+          closed: false,
+          winnerId: auction.winner_id,
+          finalPrice: Number(auction.current_price),
+        };
       }
 
       const highestBid = await tx.bid.findFirst({
@@ -125,8 +135,37 @@ export class LifecycleService implements OnModuleInit, OnModuleDestroy {
         `Auction ${auctionId} closed successfully. Winner: ${finalWinnerId ?? 'No winner (reserve not met or no bids)'}`,
       );
 
-      return { closed: true, winnerId: finalWinnerId };
+      return {
+        closed: true,
+        winnerId: finalWinnerId,
+        finalPrice: Number(auction.current_price),
+      };
     });
+
+    if (result.closed) {
+      let winnerName: string | null = null;
+      if (result.winnerId) {
+        try {
+          const winner = await this.prisma.user.findUnique({
+            where: { id: result.winnerId },
+            select: { name: true },
+          });
+          winnerName = winner?.name ?? null;
+        } catch {
+          winnerName = null;
+        }
+      }
+
+      this.realtimeGateway.broadcastAuctionClosed({
+        auctionId,
+        winnerId: result.winnerId,
+        winnerName,
+        finalPrice: result.finalPrice,
+        status: 'ENDED',
+      });
+    }
+
+    return { closed: result.closed, winnerId: result.winnerId };
   }
 
   async onModuleDestroy() {

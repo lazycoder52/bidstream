@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { BidsService } from '../src/bids/bids.service';
 import { LifecycleService } from '../src/lifecycle/lifecycle.service';
+import { RealtimeGateway } from '../src/realtime/realtime.gateway';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 describe('High-Concurrency Bidding Engine (Real PostgreSQL)', () => {
@@ -42,7 +43,18 @@ describe('High-Concurrency Bidding Engine (Real PostgreSQL)', () => {
       closeAuction: jest.fn().mockResolvedValue({ closed: true, winnerId: null }),
     } as unknown as LifecycleService;
 
-    bidsService = new BidsService(prisma as unknown as PrismaService, mockLifecycleService);
+    const mockRealtimeGateway = {
+      broadcastBidPlaced: jest.fn(),
+      sendOutbidNotice: jest.fn(),
+      broadcastAuctionExtended: jest.fn(),
+      broadcastAuctionClosed: jest.fn(),
+    } as unknown as RealtimeGateway;
+
+    bidsService = new BidsService(
+      prisma as unknown as PrismaService,
+      mockLifecycleService,
+      mockRealtimeGateway,
+    );
 
     // Clean up any old test data and seed fresh records
     const seller = await prisma.user.create({
