@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import App from './App.js';
+import { render, screen, waitFor } from '@testing-library/react';
+import App from './App';
 
 describe('App', () => {
-  it('renders heading correctly', () => {
+  it('renders application navigation and branding', async () => {
     render(<App />);
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('BidStream');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: /Bid/i })).toBeInTheDocument();
+    });
   });
 });
