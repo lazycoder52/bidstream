@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-10-29T18:42:58.318Z",
+  "bundle": {
+    "totalJsBytes": 632734,
+    "totalJsGzipBytes": 199181,
+    "totalJsKb": 617.9,
+    "totalJsGzipKb": 194.51,
+    "totalCssBytes": 33575,
+    "totalCssGzipBytes": 6688,
+    "totalCssKb": 32.79,
+    "totalCssGzipKb": 6.53,
+    "chunks": {
+      "mainIndex": {
+        "rawKb": 322.08,
+        "gzipKb": 96.1
+      },
+      "css": {
+        "rawKb": 32.79,
+        "gzipKb": 6.53
+      },
+      "vendorQuery": {
+        "rawKb": 71.76,
+        "gzipKb": 21.36
+      },
+      "vendorReact": {
+        "rawKb": 104.06,
+        "gzipKb": 35.01
+      },
+      "vendorSocket": {
+        "rawKb": 40.72,
+        "gzipKb": 12.75
+      }
+    }
+  },
+  "lighthouse": {
+    "performance": 98,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100
+  }
+}
