@@ -44,6 +44,20 @@ export function verifyReadmeMetrics() {
     errors.push(`README missing expected throughput figure: ${throughputStr} req/s`);
   }
 
+  // Check accepted and rejected bid counts if recorded
+  if (loadtest.throughput.acceptedBids !== undefined) {
+    const acceptedStr = `${loadtest.throughput.acceptedBids}`;
+    if (!readme.includes(acceptedStr)) {
+      errors.push(`README missing expected accepted bids count: ${acceptedStr}`);
+    }
+  }
+  if (loadtest.throughput.rejectedBids !== undefined) {
+    const rejectedStr = `${loadtest.throughput.rejectedBids}`;
+    if (!readme.includes(rejectedStr)) {
+      errors.push(`README missing expected rejected bids count: ${rejectedStr}`);
+    }
+  }
+
   // Check bid latency p50
   const bidP50Str = `${loadtest.latencies.httpBidP50Ms}`;
   if (!readme.includes(bidP50Str)) {

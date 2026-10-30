@@ -124,6 +124,8 @@ Bundle size measurements were collected via production build analysis of the Rea
 
 ## Database Invariants
 
+The database invariant verification suite asserts zero discrepancies across auction price synchronization, bid count integrity, strict bid amount monotonicity, duplicate bid prevention, foreign key referential consistency, and terminal auction winner resolution.
+
 Following every load storm and concurrency test run, `scripts/check-invariants.mjs` executes a database audit verifying six core invariants:
 
 1. **Current Price Consistency**: For every auction, `current_price` precisely matches `MAX(bids.amount)` of accepted bids (or `starting_price` if 0 bids exist).
@@ -139,17 +141,21 @@ The invariant audit verifies **0 violations** across all audited auctions.
 
 ## Reproduce
 
-Every result, test, and benchmark can be reproduced with single-command scripts.
+The steps below demonstrate how to configure the environment, install dependencies, run migrations, execute test suites, and initiate benchmarks from a fresh repository clone on Linux or macOS.
 
 ### Prerequisites
 
 - Node.js 22 LTS
 - Docker and Docker Compose (for PostgreSQL 16 and Redis 7)
 
-### Step 1: Start Infrastructure Containers
+### Step 1: Environment Configuration & Infrastructure
 
 ```bash
-docker compose up -d
+# Copy example environment configuration
+cp .env.example .env
+
+# Start backing PostgreSQL and Redis infrastructure containers
+docker compose up -d postgres redis
 ```
 
 ### Step 2: Install Dependencies & Build Packages
@@ -192,9 +198,15 @@ npm run test:e2e
 
 ### Step 6: Run Load Benchmark & Invariant Audit
 
+To evaluate the high-concurrency bidding storm across two clustered API instances with the rate limit loosened:
+
 ```bash
-# Execute load benchmark and write metrics/loadtest.json
-npm run test:load
+# Start dual API instances connected via Redis adapter with THROTTLE_LIMIT override
+THROTTLE_LIMIT=50000 PORT=3001 node apps/api/dist/main.js &
+THROTTLE_LIMIT=50000 PORT=3002 node apps/api/dist/main.js &
+
+# Execute load benchmark targeting both instances and write metrics/loadtest.json
+API_URLS=http://localhost:3001,http://localhost:3002 SUBSCRIBER_URL=http://localhost:3001 PUBLISHER_URL=http://localhost:3002 node scripts/run-benchmarks.mjs
 
 # Run database invariant verification
 npm run test:invariants
@@ -205,6 +217,8 @@ npm run test:measure-web
 # Verify that README.md figures match metrics/*.json exactly
 npm run test:verify-readme
 ```
+
+For the automated CI pipeline that provisions PostgreSQL and Redis service containers, runs the dual-node storm under 500 VUs, and publishes metrics artifacts, refer to [.github/workflows/benchmarks.yml](.github/workflows/benchmarks.yml).
 
 ---
 
