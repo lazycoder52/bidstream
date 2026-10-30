@@ -83,18 +83,18 @@ The load benchmark evaluates 500 concurrent virtual users executing a high-concu
 
 | Metric                                | Measured Value              | Standard / Target |
 | ------------------------------------- | --------------------------- | ----------------- |
-| **Sustained Throughput**              | 559.1 req/s                 | > 500 req/s       |
-| **Total Benchmark Requests**          | 39197 requests              | -                 |
-| **Accepted Bids**                     | 1726 bids                   | -                 |
-| **Rejected Bids (Contention/Outbid)** | 26661 bids                  | -                 |
-| **HTTP Bid Latency (p50)**            | 920.9 ms                    | < 1000 ms         |
-| **HTTP Bid Latency (p90)**            | 1088.2 ms                   | < 1200 ms         |
-| **HTTP Bid Latency (p95)**            | 1138.5 ms                   | < 1200 ms         |
-| **HTTP Browse Latency (p50)**         | 209.3 ms                    | < 300 ms          |
-| **HTTP Browse Latency (p95)**         | 439.8 ms                    | < 500 ms          |
-| **WebSocket Broadcast Delay (p50)**   | 54 ms                       | < 60 ms           |
-| **WebSocket Broadcast Delay (p95)**   | 55 ms                       | < 60 ms           |
-| **WebSocket Broadcast Delay (max)**   | 55 ms                       | < 100 ms          |
+| **Sustained Throughput**              | 608.9 req/s                 | > 500 req/s       |
+| **Total Benchmark Requests**          | 42688 requests              | -                 |
+| **Accepted Bids**                     | 1899 bids                   | -                 |
+| **Rejected Bids (Contention/Outbid)** | 29223 bids                  | -                 |
+| **HTTP Bid Latency (p50)**            | 846.1 ms                    | < 1000 ms         |
+| **HTTP Bid Latency (p90)**            | 964.4 ms                    | < 1200 ms         |
+| **HTTP Bid Latency (p95)**            | 990.1 ms                    | < 1200 ms         |
+| **HTTP Browse Latency (p50)**         | 195.7 ms                    | < 300 ms          |
+| **HTTP Browse Latency (p95)**         | 384.7 ms                    | < 500 ms          |
+| **WebSocket Broadcast Delay (p50)**   | 34 ms                       | < 60 ms           |
+| **WebSocket Broadcast Delay (p95)**   | 35 ms                       | < 60 ms           |
+| **WebSocket Broadcast Delay (max)**   | 35 ms                       | < 100 ms          |
 | **Simultaneous WebSocket Clients**    | 50 clients                  | 50 clients        |
 | **Database Invariant Violations**     | 0 violations (passed: true) | Exactly 0         |
 
@@ -117,7 +117,7 @@ Bundle size measurements were collected via production build analysis of the Rea
 
 #### Headless Lighthouse Audit Scores
 
-- **Performance**: 70 / 100
+- **Performance**: 54 / 100
 - **Accessibility**: 95 / 100
 - **Best Practices**: 96 / 100
 - **SEO**: 82 / 100
