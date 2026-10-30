@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CreateAuctionDtoSchema, CreateAuctionDto } from '@bidstream/contracts';
+import { z } from 'zod';
+import { CreateAuctionDto } from '@bidstream/contracts';
 import { auctionsApi, ApiClientError } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth.store';
 import {
@@ -18,6 +19,49 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertCircle, ArrowLeft, PlusCircle, ShieldAlert } from 'lucide-react';
 
+const createAuctionFormSchema = z
+  .object({
+    title: z.string().trim().min(3, 'Title must be at least 3 characters').max(120),
+    description: z.string().trim().min(10, 'Description must be at least 10 characters').max(2000),
+    startingPrice: z.coerce.number().positive('Starting price must be greater than 0'),
+    reservePrice: z
+      .union([
+        z.coerce.number().positive('Reserve price must be greater than 0'),
+        z.literal(''),
+        z.undefined(),
+      ])
+      .optional(),
+    minIncrement: z.coerce
+      .number()
+      .positive('Minimum increment must be greater than 0')
+      .default(1.0),
+    startTime: z.string().min(1, 'Start time is required'),
+    endTime: z.string().min(1, 'End time is required'),
+  })
+  .refine(
+    (data) => {
+      const start = new Date(data.startTime).getTime();
+      const end = new Date(data.endTime).getTime();
+      return !isNaN(start) && !isNaN(end) && end > start;
+    },
+    {
+      message: 'End time must be after start time',
+      path: ['endTime'],
+    },
+  )
+  .refine(
+    (data) => {
+      if (!data.reservePrice || typeof data.reservePrice !== 'number') return true;
+      return data.reservePrice >= data.startingPrice;
+    },
+    {
+      message: 'Reserve price must be greater than or equal to starting price',
+      path: ['reservePrice'],
+    },
+  );
+
+type CreateAuctionFormData = z.infer<typeof createAuctionFormSchema>;
+
 export const CreateAuctionPage: React.FC = () => {
   const { user } = useAuthStore();
   const navigate = useNavigate();
@@ -32,26 +76,33 @@ export const CreateAuctionPage: React.FC = () => {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<CreateAuctionDto>({
-    resolver: zodResolver(CreateAuctionDtoSchema),
+  } = useForm<CreateAuctionFormData>({
+    resolver: zodResolver(createAuctionFormSchema),
     defaultValues: {
       title: '',
       description: '',
       startingPrice: 50,
       minIncrement: 5,
-      startTime: new Date().toISOString(),
-      endTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+      startTime: defaultStart,
+      endTime: defaultEnd,
     },
   });
 
-  const onSubmit = async (data: CreateAuctionDto) => {
+  const onSubmit = async (data: CreateAuctionFormData) => {
     setServerError(null);
     try {
-      const created = await auctionsApi.create({
-        ...data,
+      const payload: CreateAuctionDto = {
+        title: data.title,
+        description: data.description,
+        startingPrice: Number(data.startingPrice),
+        minIncrement: Number(data.minIncrement),
         startTime: new Date(data.startTime).toISOString(),
         endTime: new Date(data.endTime).toISOString(),
-      });
+        ...(data.reservePrice && typeof data.reservePrice === 'number'
+          ? { reservePrice: data.reservePrice }
+          : {}),
+      };
+      const created = await auctionsApi.create(payload);
       navigate(`/auctions/${created.id}`);
     } catch (err) {
       if (err instanceof ApiClientError) {
