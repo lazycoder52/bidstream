@@ -112,8 +112,24 @@ export async function request<T>(endpoint: string, options: RequestOptions = {})
 
   const rawJson = await response.json();
 
+  const payload =
+    rawJson &&
+    typeof rawJson === 'object' &&
+    'success' in rawJson &&
+    'data' in rawJson &&
+    (rawJson as Record<string, unknown>).success === true
+      ? (rawJson as Record<string, unknown>).data
+      : rawJson;
+
   if (schema) {
-    const validationResult = schema.safeParse(rawJson);
+    let validationResult = schema.safeParse(payload);
+    if (!validationResult.success && payload !== rawJson) {
+      const rawValidation = schema.safeParse(rawJson);
+      if (rawValidation.success) {
+        validationResult = rawValidation;
+      }
+    }
+
     if (!validationResult.success) {
       console.error(
         `[Contracts Validation Error] Schema mismatch on ${endpoint}:`,
@@ -126,7 +142,7 @@ export async function request<T>(endpoint: string, options: RequestOptions = {})
     return validationResult.data as T;
   }
 
-  return rawJson as T;
+  return payload as T;
 }
 
 export const PaginatedAuctionsSchema = createPaginatedResponseSchema(AuctionDtoSchema);
