@@ -92,3 +92,64 @@ jobs:
 
       - name: Verify README metrics consistency
         run: node scripts/verify-readme-metrics.mjs
+
+  docker-compose-check:
+    name: Docker Compose Full-Stack Build & Health Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker images
+        run: docker compose build
+
+      - name: Start full stack with Docker Compose
+        run: |
+          if ! docker compose up -d; then
+            echo "docker compose up -d failed. Showing logs of all containers:"
+            docker compose logs
+            exit 1
+          fi
+
+      - name: Verify API and downstream health
+        run: |
+          echo "Waiting for API service to report healthy..."
+          for i in {1..30}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/health || true)
+            echo "Attempt $i: API /health HTTP status = $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "API is healthy and reporting 200 OK!"
+              break
+            fi
+            sleep 2
+          done
+          if [ "$STATUS" != "200" ]; then
+            echo "API failed healthcheck! Dumping docker compose logs:"
+            docker compose logs
+            exit 1
+          fi
+
+      - name: Verify Web frontend is healthy
+        run: |
+          echo "Waiting for Web service to respond..."
+          for i in {1..15}; do
+            WEB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ || true)
+            echo "Attempt $i: Web status = $WEB_STATUS"
+            if [ "$WEB_STATUS" = "200" ]; then
+              echo "Web container is responding with 200 OK!"
+              break
+            fi
+            sleep 2
+          done
+          if [ "$WEB_STATUS" != "200" ]; then
+            echo "Web container failed to respond! Dumping logs:"
+            docker compose logs web
+            exit 1
+          fi
+
+      - name: Stop Docker Compose stack
+        if: always()
+        run: docker compose down -v
