@@ -162,7 +162,8 @@ npm run build
 ### Step 3: Run Database Migrations
 
 ```bash
-npm run prisma:migrate:deploy -w @bidstream/api
+npm run prisma:generate
+npm run prisma:migrate:deploy
 ```
 
 ### Step 4: Run Static Checks & Typecheck
@@ -184,6 +185,9 @@ npm test -w @bidstream/api -- test/bidding.concurrency.spec.ts
 
 # Run the multi-instance Socket.IO Redis adapter synchronization test
 npm test -w @bidstream/api -- test/realtime.multi-instance.spec.ts
+
+# Run Playwright end-to-end browser tests
+npm run test:e2e
 ```
 
 ### Step 6: Run Load Benchmark & Invariant Audit
@@ -210,6 +214,7 @@ npm run test:verify-readme
 2. **Synchronous Lock Holding**: Bids holding the row lock block competing bidders until completion. To ensure sub-15ms p50 latency, transactions must never perform non-database operations (HTTP calls, email, disk I/O) within the lock boundary.
 3. **In-Memory WebSocket Gateway State**: While event distribution scales via Redis Pub/Sub, individual WebSocket socket connections are maintained in memory per instance. Reconnections trigger an explicit database replay step via `lastBidId`.
 4. **No Native Payment Processing**: In accordance with project boundaries, bid placement reserves authorization hold logic but does not integrate external payment gateway webhooks.
+5. **Load Test Throttler Override**: For load test benchmarks and CI smoke execution, the API rate throttler limit (`THROTTLE_LIMIT`) is overridden from the production default of 120 requests/minute to 50,000 requests/minute via environment configuration so high-volume concurrent traffic can be tested without synthetic client 429 rejections.
 
 ---
 
