@@ -9,6 +9,7 @@ import {
   Res,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation, ApiResponse as SwaggerResponse } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service.js';
@@ -26,6 +27,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly usersService: UsersService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Public()
@@ -71,6 +73,8 @@ export class AuthController {
     @Body() dto: RefreshTokenDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<ApiResponse<{ accessToken: string }>> {
+    this.verifyOrigin(req);
+
     const token = req.cookies?.refresh_token || dto.refreshToken;
     if (!token) {
       throw new UnauthorizedException('Refresh token is required');
@@ -99,6 +103,7 @@ export class AuthController {
       httpOnly: true,
       secure: process.env['NODE_ENV'] === 'production',
       sameSite: 'strict',
+      path: '/',
     });
     return {
       success: true,
@@ -117,11 +122,40 @@ export class AuthController {
     };
   }
 
+  private verifyOrigin(req: Request) {
+    const origin = req.headers['origin'] as string | undefined;
+    const referer = req.headers['referer'] as string | undefined;
+
+    let requestOrigin = origin;
+    if (!requestOrigin && referer) {
+      try {
+        requestOrigin = new URL(referer).origin;
+      } catch {
+        // Ignore unparseable referer
+      }
+    }
+
+    if (requestOrigin) {
+      const allowedConfig = this.configService.get<string>('CORS_ORIGIN', 'http://localhost:5173');
+      const allowedOrigins = allowedConfig
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean);
+
+      if (!allowedOrigins.includes(requestOrigin)) {
+        throw new UnauthorizedException(
+          `Request origin '${requestOrigin}' is not authorized for refresh token rotation`,
+        );
+      }
+    }
+  }
+
   private setRefreshTokenCookie(res: Response, token: string) {
     res.cookie('refresh_token', token, {
       httpOnly: true,
       secure: process.env['NODE_ENV'] === 'production',
       sameSite: 'strict',
+      path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
   }
