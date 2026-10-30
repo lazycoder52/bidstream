@@ -8,7 +8,7 @@ import { BidPlacedEvent } from '@bidstream/contracts';
 
 // Spawns two distinct in-process HTTP and Socket.IO servers bound to dynamic ports sharing
 // @socket.io/redis-adapter to verify pub/sub broadcast distribution.
-// (For separate OS process execution, see realtime.two-process.spec.ts and .github/workflows/benchmarks.yml).
+// (The two separate OS processes check is performed by .github/workflows/benchmarks.yml).
 describe('Real-Time Multi-Instance Synchronization (Two In-Process Servers on Redis Adapter)', () => {
   let isRedisAvailable = false;
   let redisPub1: Redis | null = null;

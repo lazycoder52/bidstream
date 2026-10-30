@@ -67,7 +67,7 @@ Full architectural decision records are documented in [`docs/adr/`](docs/adr/):
 1. **[ADR-001: Pessimistic Row Locking vs Optimistic Versioning](docs/adr/001-pessimistic-locking-vs-optimistic-versioning.md)**: Under high contention (hundreds of concurrent bids on a closing auction), optimistic locking (`@version` / CAS) causes catastrophic transaction abort cascades and throughput collapse. BidStream uses PostgreSQL `SELECT ... FOR UPDATE` row locks inside `ReadCommitted` interactive transactions, queuing incoming bids serialized by a row lock with zero aborted retries.
 2. **[ADR-002: Idempotency Keys Design](docs/adr/002-idempotency-keys-design.md)**: Network retries from clients are deduplicated via an atomic `idempotency_keys` table inside the transaction boundary, storing and replaying original 201 responses with zero side effects.
 3. **[ADR-003: Double-Layer Closing Architecture](docs/adr/003-closing-architecture-bullmq-and-skip-locked-sweeper.md)**: Auction closing uses BullMQ delayed jobs as the primary millisecond-precision trigger (rescheduled dynamically upon anti-sniping extensions) combined with a periodic 10-second `SKIP LOCKED` database sweeper as a safety net against queue loss.
-4. **[ADR-004: Redis Adapter for Horizontal WebSocket Scaling](docs/adr/004-redis-adapter-horizontal-websocket-scaling.md)**: Real-time event broadcasting scales horizontally across multiple API processes via `@socket.io/redis-adapter` (tested with two in-process Socket.IO servers in `realtime.multi-instance.spec.ts`, two spawned OS processes in `realtime.two-process.spec.ts`, and clustered dual-API instances under k6 storm in `benchmarks.yml`). Clients reconnecting with `lastBidId` replay missed events directly from the append-only `bids` ledger.
+4. **[ADR-004: Redis Adapter for Horizontal WebSocket Scaling](docs/adr/004-redis-adapter-horizontal-websocket-scaling.md)**: Real-time event broadcasting scales horizontally across multiple API processes via `@socket.io/redis-adapter` (tested with two in-process Socket.IO servers in `realtime.multi-instance.spec.ts`, and with two separate OS processes in `.github/workflows/benchmarks.yml` under 500-VU load storm). Clients reconnecting with `lastBidId` replay missed events directly from the append-only `bids` ledger.
 5. **[ADR-005: Shared Monorepo Zod Contracts](docs/adr/005-shared-zod-contracts-single-source-of-truth.md)**: `@bidstream/contracts` serves as the single source of truth for REST DTOs, WebSocket events, and environment schemas. The frontend API client parses and validates every HTTP response at runtime, preventing contract drift.
 6. **[ADR-006: Prisma Interactive Transactions with Raw SQL Locking](docs/adr/006-prisma-interactive-transactions-with-raw-sql-locking.md)**: Combines Prisma's ergonomic schema management and relational queries with parameterized `$queryRaw` row locks (`FOR UPDATE` and `FOR UPDATE SKIP LOCKED`) inside `$transaction` blocks.
 
@@ -182,8 +182,8 @@ npm test
 # Run the 200-bid parallel PostgreSQL concurrency verification test
 npm test -w @bidstream/api -- test/bidding.concurrency.spec.ts
 
-# Run the cross-process multi-instance Socket.IO realtime synchronization test
-npm test -w @bidstream/api -- test/realtime.two-process.spec.ts
+# Run the multi-instance Socket.IO Redis adapter synchronization test
+npm test -w @bidstream/api -- test/realtime.multi-instance.spec.ts
 ```
 
 ### Step 6: Run Load Benchmark & Invariant Audit
