@@ -213,7 +213,7 @@ test.describe('Real-Time Auction & Bidding E2E Workflows', () => {
 
     // Verify error notification is displayed
     await expect(
-      buyer1Page.getByText(/Outbid: A higher bid has already been accepted/i),
+      buyer1Page.getByText(/Outbid: A higher bid has already been accepted/i).first(),
     ).toBeVisible({ timeout: 10000 });
 
     // Verify state rollback: current price reverts/remains at $150
