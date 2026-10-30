@@ -9,6 +9,7 @@ on:
 jobs:
   test-and-lint:
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:16-alpine
@@ -23,6 +24,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
       redis:
         image: redis:7-alpine
         ports:
@@ -38,6 +40,8 @@ jobs:
       DATABASE_URL: postgresql://bidstream:bidstream_pass@localhost:5432/bidstream_db?schema=public
       REDIS_HOST: localhost
       REDIS_PORT: 6379
+      REDIS_IN_MEMORY: 'false'
+      THROTTLE_FAIL_OPEN: 'false'
       JWT_ACCESS_SECRET: change_this_to_a_secure_random_string_at_least_32_characters_long
       JWT_REFRESH_SECRET: change_this_to_another_secure_random_string_at_least_32_chars
       PORT: 3001
@@ -78,8 +82,8 @@ jobs:
 
       - name: Run load benchmark smoke & invariant check
         run: |
-          npm run test:load
-          npm run test:invariants
+          node scripts/measure-socket-latency.mjs
+          node scripts/check-invariants.mjs
 
       - name: Verify README metrics consistency
-        run: npm run test:verify-readme
+        run: node scripts/verify-readme-metrics.mjs

@@ -10,24 +10,52 @@ export class RedisIoAdapter extends IoAdapter {
   private pubClient: Redis | null = null;
   private subClient: Redis | null = null;
 
-  async connectToRedis(redisHost: string, redisPort: number): Promise<void> {
+  async connectToRedis(redisHost: string, redisPort: number, allowInMemory = false): Promise<void> {
     try {
       this.pubClient = new Redis({
         host: redisHost,
         port: redisPort,
         lazyConnect: true,
         maxRetriesPerRequest: 3,
+        connectTimeout: 3000,
       });
       this.subClient = this.pubClient.duplicate();
 
-      await Promise.all([this.pubClient.connect(), this.subClient.connect()]);
+      const connectTimeout = new Promise<never>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                `Redis adapter connection timed out after 3000ms to ${redisHost}:${redisPort}`,
+              ),
+            ),
+          3000,
+        ),
+      );
+
+      await Promise.race([
+        Promise.all([this.pubClient.connect(), this.subClient.connect()]),
+        connectTimeout,
+      ]);
+
       this.adapterConstructor = createAdapter(this.pubClient, this.subClient);
       this.adapterLogger.log(`Connected to Redis adapter at ${redisHost}:${redisPort}`);
     } catch (error) {
-      this.adapterLogger.warn(
-        `Failed to connect to Redis adapter (${error instanceof Error ? error.message : String(error)}). Falling back to in-memory adapter.`,
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      if (allowInMemory) {
+        this.adapterLogger.warn(
+          `Failed to connect to Redis adapter (${errorMsg}). Explicit dev flag allows in-memory adapter fallback.`,
+        );
+        this.adapterConstructor = null;
+        return;
+      }
+
+      this.adapterLogger.error(
+        `Failed to connect to Redis adapter at ${redisHost}:${redisPort}: ${errorMsg}. Fail-fast startup enforced.`,
       );
-      this.adapterConstructor = null;
+      throw new Error(
+        `Failed to connect to Redis adapter at ${redisHost}:${redisPort}: ${errorMsg}. Silent in-memory fallback is disabled.`,
+      );
     }
   }
 
