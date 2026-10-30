@@ -107,9 +107,7 @@ describe('Idempotency Key Protocol & Replay Engine', () => {
         .catch(() => {});
       await prisma.auction.delete({ where: { id: auctionId } }).catch(() => {});
     }
-    if (buyerId) {
-      await prisma.user.delete({ where: { id: buyerId } }).catch(() => {});
-    }
+    await prisma.user.deleteMany({ where: { email: { contains: 'idemp' } } }).catch(() => {});
     if (app) {
       await app.close();
     }
@@ -151,12 +149,19 @@ describe('Idempotency Key Protocol & Replay Engine', () => {
 
   it('does not replay when a different idempotency key is provided', async () => {
     if (!isPostgresAvailable) return;
+    const buyer2 = await authService.register({
+      email: `buyer2-idemp-${Date.now()}@example.com`,
+      password: 'Password123!',
+      name: 'Idempotency Buyer 2',
+      role: 'BUYER',
+    });
+
     const key1 = `diff-key-1-${Date.now()}`;
     const key2 = `diff-key-2-${Date.now()}`;
 
     const res1 = await request(app.getHttpServer())
       .post(`/auctions/${auctionId}/bids`)
-      .set('Authorization', `Bearer ${buyerToken}`)
+      .set('Authorization', `Bearer ${buyer2.accessToken}`)
       .set('Idempotency-Key', key1)
       .send({ amount: 170 });
 
@@ -165,10 +170,10 @@ describe('Idempotency Key Protocol & Replay Engine', () => {
     // New key with same amount should be rejected as an under-increment or equal price
     const res2 = await request(app.getHttpServer())
       .post(`/auctions/${auctionId}/bids`)
-      .set('Authorization', `Bearer ${buyerToken}`)
+      .set('Authorization', `Bearer ${buyer2.accessToken}`)
       .set('Idempotency-Key', key2)
       .send({ amount: 170 });
 
-    expect(res2.status).toBe(400); // Bad Request (already holds highest bid) or 409
+    expect(res2.status).toBe(400); // Bad Request (already holds highest bid)
   });
 });
