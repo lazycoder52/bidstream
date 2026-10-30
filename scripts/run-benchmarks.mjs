@@ -56,96 +56,74 @@ async function runBenchmarkSuite() {
     });
     console.log(`Measured p95 broadcast delay: ${socketMetrics.broadcastDelayP95Ms} ms`);
   } catch (err) {
-    if (process.env['CI'] === 'true') {
-      throw new Error(`Socket latency measurement failed in CI: ${err.message}`);
-    }
-    console.warn('Socket latency measurement fallback (using baseline):', err.message);
-    socketMetrics = {
-      connectedSocketClients: 500,
-      broadcastDelayMinMs: 4.1,
-      broadcastDelayP50Ms: 12.3,
-      broadcastDelayP90Ms: 21.8,
-      broadcastDelayP95Ms: 28.4,
-      broadcastDelayMaxMs: 49.2,
-    };
+    console.error(`FATAL: Socket latency measurement failed: ${err.message}`);
+    process.exit(1);
   }
 
-  // 3. Run k6 Bidding Storm or Node HTTP contention storm
-  let throughputMetrics = {
-    requestsPerSecond: 1420.5,
-    totalRequests: 99435,
-    successfulRequests: 98920,
-    acceptedBids: 80470,
-    rejectedBids: 18450,
-    conflictResponses409: 18450,
-    errorRatePercent: 0.0,
-  };
+  // 3. Run k6 Bidding Storm against clustered API instances
+  if (!isCommandAvailable('k6')) {
+    console.error('FATAL: k6 binary is required on PATH to execute the benchmark suite.');
+    process.exit(1);
+  }
 
-  let latencyMetrics = {
-    httpBidP50Ms: 14.2,
-    httpBidP90Ms: 28.6,
-    httpBidP95Ms: 42.1,
-    httpBrowseP50Ms: 3.8,
-    httpBrowseP95Ms: 11.5,
-  };
-
-  const k6Available = isCommandAvailable('k6');
   const summaryExportPath = path.join(metricsDir, 'k6-summary.json');
+  console.log('\nRunning k6 high-concurrency bidding storm against API cluster...');
+  const k6ScriptPath = path.join(rootDir, 'scripts', 'k6-bidding-storm.js');
+  const apiUrls = process.env['API_URLS'] || 'http://localhost:3001,http://localhost:3002';
+  const benchmarkTokensArg = tokens?.length ? `-e BENCHMARK_TOKENS="${tokens.join(',')}"` : '';
 
-  if (k6Available) {
-    console.log('\nRunning k6 high-concurrency bidding storm against API cluster...');
-    const k6ScriptPath = path.join(rootDir, 'scripts', 'k6-bidding-storm.js');
-    const apiUrls = process.env['API_URLS'] || 'http://localhost:3001,http://localhost:3002';
-
-    try {
-      const benchmarkTokensArg = tokens?.length ? `-e BENCHMARK_TOKENS="${tokens.join(',')}"` : '';
-      execSync(
-        `k6 run --summary-export="${summaryExportPath}" -e API_URLS="${apiUrls}" ${benchmarkTokensArg} -e BENCHMARK_TOKEN="${token}" "${k6ScriptPath}"`,
-        { stdio: 'inherit', cwd: rootDir },
-      );
-    } catch (k6Err) {
-      console.warn('k6 execution completed with threshold alert or warning:', k6Err.message);
-    }
-
-    if (fs.existsSync(summaryExportPath)) {
-      const k6Summary = JSON.parse(fs.readFileSync(summaryExportPath, 'utf-8'));
-      const m = k6Summary.metrics;
-
-      const totalReqs = m['http_reqs']?.values?.count ?? m['http_reqs']?.count ?? 0;
-      const reqRate = m['http_reqs']?.values?.rate ?? m['http_reqs']?.rate ?? 0;
-      const conflicts = m['bids_conflict_409']?.values?.count ?? m['bids_conflict_409']?.count ?? 0;
-      const accepted = m['bids_accepted']?.values?.count ?? m['bids_accepted']?.count ?? 0;
-      const rejected = m['bids_rejected']?.values?.count ?? m['bids_rejected']?.count ?? conflicts;
-      const bidDur = m['bid_latency_ms']?.values ?? m['bid_latency_ms'];
-      const browseDur = m['browse_latency_ms']?.values ?? m['browse_latency_ms'];
-
-      throughputMetrics = {
-        requestsPerSecond: Number(reqRate.toFixed(1)),
-        totalRequests: totalReqs,
-        successfulRequests: accepted + conflicts,
-        acceptedBids: accepted,
-        rejectedBids: rejected,
-        conflictResponses409: conflicts,
-        errorRatePercent:
-          totalReqs > 0
-            ? Number((((totalReqs - (accepted + conflicts)) / totalReqs) * 100).toFixed(2))
-            : 0,
-      };
-
-      if (bidDur) {
-        latencyMetrics.httpBidP50Ms = Number((bidDur['p(50)'] ?? bidDur['med'] ?? 0).toFixed(1));
-        latencyMetrics.httpBidP90Ms = Number((bidDur['p(90)'] ?? 0).toFixed(1));
-        latencyMetrics.httpBidP95Ms = Number((bidDur['p(95)'] ?? 0).toFixed(1));
-      }
-
-      if (browseDur) {
-        latencyMetrics.httpBrowseP50Ms = Number((browseDur['p(50)'] ?? browseDur['med'] ?? 0).toFixed(1));
-        latencyMetrics.httpBrowseP95Ms = Number((browseDur['p(95)'] ?? 0).toFixed(1));
-      }
-    }
-  } else {
-    console.log('\nk6 not detected on PATH. Executing verified baseline concurrency run.');
+  try {
+    execSync(
+      `k6 run --summary-export="${summaryExportPath}" -e API_URLS="${apiUrls}" ${benchmarkTokensArg} -e BENCHMARK_TOKEN="${token}" "${k6ScriptPath}"`,
+      { stdio: 'inherit', cwd: rootDir },
+    );
+  } catch (k6Err) {
+    console.error('FATAL: k6 execution failed:', k6Err.message);
+    process.exit(1);
   }
+
+  if (!fs.existsSync(summaryExportPath)) {
+    console.error(`FATAL: k6 summary export file not found at ${summaryExportPath}`);
+    process.exit(1);
+  }
+
+  const k6Summary = JSON.parse(fs.readFileSync(summaryExportPath, 'utf-8'));
+  const m = k6Summary.metrics;
+
+  const totalReqs = m['http_reqs']?.values?.count ?? m['http_reqs']?.count ?? 0;
+  const reqRate = m['http_reqs']?.values?.rate ?? m['http_reqs']?.rate ?? 0;
+  const conflicts = m['bids_conflict_409']?.values?.count ?? m['bids_conflict_409']?.count ?? 0;
+  const accepted = m['bids_accepted']?.values?.count ?? m['bids_accepted']?.count ?? 0;
+  const rejected = m['bids_rejected']?.values?.count ?? m['bids_rejected']?.count ?? conflicts;
+  const bidDur = m['bid_latency_ms']?.values ?? m['bid_latency_ms'];
+  const browseDur = m['browse_latency_ms']?.values ?? m['browse_latency_ms'];
+
+  // Real error rate computed directly from k6 http_req_failed metric
+  const reqFailedRate = m['http_req_failed']?.values?.rate ?? m['http_req_failed']?.rate ?? 0;
+  const errorRatePercent = Number((reqFailedRate * 100).toFixed(2));
+
+  if (!totalReqs || !bidDur) {
+    console.error('FATAL: Incomplete k6 metrics gathered from load storm.');
+    process.exit(1);
+  }
+
+  const throughputMetrics = {
+    requestsPerSecond: Number(reqRate.toFixed(1)),
+    totalRequests: totalReqs,
+    successfulRequests: accepted + conflicts,
+    acceptedBids: accepted,
+    rejectedBids: rejected,
+    conflictResponses409: conflicts,
+    errorRatePercent,
+  };
+
+  const latencyMetrics = {
+    httpBidP50Ms: Number((bidDur['p(50)'] ?? bidDur['med'] ?? 0).toFixed(1)),
+    httpBidP90Ms: Number((bidDur['p(90)'] ?? 0).toFixed(1)),
+    httpBidP95Ms: Number((bidDur['p(95)'] ?? 0).toFixed(1)),
+    httpBrowseP50Ms: browseDur ? Number((browseDur['p(50)'] ?? browseDur['med'] ?? 0).toFixed(1)) : 0,
+    httpBrowseP95Ms: browseDur ? Number((browseDur['p(95)'] ?? 0).toFixed(1)) : 0,
+  };
 
   // 4. Invariant audit
   console.log('\nRunning database invariant verification...');
@@ -172,12 +150,12 @@ async function runBenchmarkSuite() {
     throughput: throughputMetrics,
     latencies: latencyMetrics,
     realtime: {
-      connectedSocketClients: socketMetrics.connectedSocketClients || 500,
-      broadcastDelayMinMs: socketMetrics.broadcastDelayMinMs || 4.1,
-      broadcastDelayP50Ms: socketMetrics.broadcastDelayP50Ms || 12.3,
-      broadcastDelayP90Ms: socketMetrics.broadcastDelayP90Ms || 21.8,
-      broadcastDelayP95Ms: socketMetrics.broadcastDelayP95Ms || 28.4,
-      broadcastDelayMaxMs: socketMetrics.broadcastDelayMaxMs || 49.2,
+      connectedSocketClients: socketMetrics.connectedSocketClients,
+      broadcastDelayMinMs: socketMetrics.broadcastDelayMinMs,
+      broadcastDelayP50Ms: socketMetrics.broadcastDelayP50Ms,
+      broadcastDelayP90Ms: socketMetrics.broadcastDelayP90Ms,
+      broadcastDelayP95Ms: socketMetrics.broadcastDelayP95Ms,
+      broadcastDelayMaxMs: socketMetrics.broadcastDelayMaxMs,
     },
     invariants: {
       auctionsAudited: invariantResult.totalAuctionsChecked,
@@ -205,6 +183,7 @@ async function runBenchmarkSuite() {
   console.log(` Throughput:      ${report.throughput.requestsPerSecond} req/s`);
   console.log(` Accepted Bids:   ${report.throughput.acceptedBids}`);
   console.log(` Rejected Bids:   ${report.throughput.rejectedBids}`);
+  console.log(` Error Rate:      ${report.throughput.errorRatePercent} %`);
   console.log(` Bid Latency p50: ${report.latencies.httpBidP50Ms} ms`);
   console.log(` Bid Latency p95: ${report.latencies.httpBidP95Ms} ms`);
   console.log(` Socket Delay p95:${report.realtime.broadcastDelayP95Ms} ms`);

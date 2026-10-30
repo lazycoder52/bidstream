@@ -231,7 +231,7 @@ For the automated CI pipeline that provisions PostgreSQL and Redis service conta
 3. **In-Memory WebSocket Gateway State**: While event distribution scales via Redis Pub/Sub, individual WebSocket socket connections are maintained in memory per instance. Reconnections trigger an explicit database replay step via `lastBidId`.
 4. **No Native Payment Processing**: In accordance with project boundaries, bid placement reserves authorization hold logic but does not integrate external payment gateway webhooks.
 5. **Load Test Throttler Override**: For load test benchmarks and CI smoke execution, the API rate throttler limit (`THROTTLE_LIMIT`) is overridden from the production default of 120 requests/minute to 50,000 requests/minute via environment configuration so high-volume concurrent traffic can be tested without synthetic client 429 rejections.
-6. **CI Smoke Contention Threshold**: In the 30-second automated CI smoke suite, the `http_req_failed` error threshold is set to `rate<0.85` (identical to the benchmark suite) rather than `rate<0.10` so expected HTTP 409 Outbid Conflict responses resulting from concurrent bidding contention are not treated as transport errors.
+6. **Load Storm Error Thresholds**: In the 30-second automated CI smoke suite, the HTTP failure threshold is enforced at `http_req_failed: ['rate<0.10']` with status codes 200, 201, and 409 registered as expected responses via `http.setResponseCallback(http.expectedStatuses(200, 201, 409))`. In the full 500-VU exploratory load benchmark, no arbitrary pass/fail latency or error thresholds are enforced (`thresholds: {}`) so raw empirical measurements under saturation are captured and exported to `metrics/loadtest.json` without artificial exit-code truncation.
 
 ---
 

@@ -189,7 +189,7 @@ jobs:
       - name: Seed benchmark auctions and test bidders
         env:
           DATABASE_URL: postgresql://bidstream:bidstream_pass@localhost:5432/bidstream_db?schema=public
-          JWT_ACCESS_SECRET: production_access_token_secret_must_be_32_characters
+          JWT_ACCESS_SECRET: dev-only-jwt-access-secret-minimum-32-characters-long
         run: node scripts/seed-benchmark.mjs
 
       - name: Run 30-second k6 bidding storm smoke against the stack
