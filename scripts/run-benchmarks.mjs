@@ -40,7 +40,7 @@ async function runBenchmarkSuite() {
   console.log('Connected to PostgreSQL.');
 
   // 1. Seed 20 benchmark auctions and test users
-  const { token, auctionIds } = await seedBenchmarkData(prisma);
+  const { token, tokens, auctionIds } = await seedBenchmarkData(prisma);
 
   // 2. Measure real-time Socket.IO latency across two API instances via Redis
   console.log('\nMeasuring cross-instance WebSocket broadcast delay...');
@@ -97,8 +97,9 @@ async function runBenchmarkSuite() {
     const apiUrls = process.env['API_URLS'] || 'http://localhost:3001,http://localhost:3002';
 
     try {
+      const benchmarkTokensArg = tokens?.length ? `-e BENCHMARK_TOKENS="${tokens.join(',')}"` : '';
       execSync(
-        `k6 run --summary-export="${summaryExportPath}" -e API_URLS="${apiUrls}" -e BENCHMARK_TOKEN="${token}" "${k6ScriptPath}"`,
+        `k6 run --summary-export="${summaryExportPath}" -e API_URLS="${apiUrls}" ${benchmarkTokensArg} -e BENCHMARK_TOKEN="${token}" "${k6ScriptPath}"`,
         { stdio: 'inherit', cwd: rootDir },
       );
     } catch (k6Err) {
@@ -109,12 +110,12 @@ async function runBenchmarkSuite() {
       const k6Summary = JSON.parse(fs.readFileSync(summaryExportPath, 'utf-8'));
       const m = k6Summary.metrics;
 
-      const totalReqs = m['http_reqs']?.values?.count ?? 0;
-      const reqRate = m['http_reqs']?.values?.rate ?? 0;
-      const conflicts = m['bids_conflict_409']?.values?.count ?? 0;
-      const accepted = m['bids_accepted']?.values?.count ?? 0;
-      const bidDur = m['bid_latency_ms']?.values;
-      const browseDur = m['browse_latency_ms']?.values;
+      const totalReqs = m['http_reqs']?.values?.count ?? m['http_reqs']?.count ?? 0;
+      const reqRate = m['http_reqs']?.values?.rate ?? m['http_reqs']?.rate ?? 0;
+      const conflicts = m['bids_conflict_409']?.values?.count ?? m['bids_conflict_409']?.count ?? 0;
+      const accepted = m['bids_accepted']?.values?.count ?? m['bids_accepted']?.count ?? 0;
+      const bidDur = m['bid_latency_ms']?.values ?? m['bid_latency_ms'];
+      const browseDur = m['browse_latency_ms']?.values ?? m['browse_latency_ms'];
 
       throughputMetrics = {
         requestsPerSecond: Number(reqRate.toFixed(1)),
@@ -128,14 +129,14 @@ async function runBenchmarkSuite() {
       };
 
       if (bidDur) {
-        latencyMetrics.httpBidP50Ms = Number((bidDur['p(50)'] ?? 0).toFixed(1));
+        latencyMetrics.httpBidP50Ms = Number((bidDur['p(50)'] ?? bidDur['med'] ?? 0).toFixed(1));
         latencyMetrics.httpBidP90Ms = Number((bidDur['p(90)'] ?? 0).toFixed(1));
         latencyMetrics.httpBidP95Ms = Number((bidDur['p(95)'] ?? 0).toFixed(1));
         latencyMetrics.httpBidP99Ms = Number((bidDur['p(99)'] ?? 0).toFixed(1));
       }
 
       if (browseDur) {
-        latencyMetrics.httpBrowseP50Ms = Number((browseDur['p(50)'] ?? 0).toFixed(1));
+        latencyMetrics.httpBrowseP50Ms = Number((browseDur['p(50)'] ?? browseDur['med'] ?? 0).toFixed(1));
         latencyMetrics.httpBrowseP95Ms = Number((browseDur['p(95)'] ?? 0).toFixed(1));
       }
     }

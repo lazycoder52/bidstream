@@ -47,6 +47,14 @@ function getBaseUrl(index) {
   return BASE_URLS[index % BASE_URLS.length];
 }
 
+const TOKENS = (__ENV.BENCHMARK_TOKENS || __ENV.BENCHMARK_TOKEN || 'test-token')
+  .split(',')
+  .map((t) => t.trim());
+
+function getToken(index) {
+  return TOKENS[index % TOKENS.length];
+}
+
 // Pool of 20 auction IDs generated during test setup or benchmark run
 const AUCTION_IDS = [
   '10000000-0000-0000-0000-000000000001',
@@ -86,7 +94,7 @@ export function biddingFlow() {
     headers: {
       'Content-Type': 'application/json',
       'Idempotency-Key': idempotencyKey,
-      Authorization: `Bearer ${__ENV.BENCHMARK_TOKEN || 'test-token'}`,
+      Authorization: `Bearer ${getToken(vuId)}`,
     },
     tags: { name: 'PostBid' },
   };
