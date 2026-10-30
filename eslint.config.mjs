@@ -11,6 +11,8 @@ export default tseslint.config(
       '**/build/**',
       '**/.turbo/**',
       '**/metrics/**',
+      '**/playwright-report/**',
+      '**/test-results/**',
       '**/*.d.ts',
     ],
   },

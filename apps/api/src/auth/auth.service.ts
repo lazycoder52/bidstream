@@ -79,7 +79,7 @@ export class AuthService {
 
   async refreshTokens(
     refreshToken: string,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  ): Promise<{ user: UserDto; accessToken: string; refreshToken: string }> {
     let payload: JwtPayload;
     try {
       payload = this.jwtService.verify<JwtPayload>(refreshToken, {
@@ -114,7 +114,8 @@ export class AuthService {
       createdAt: user.createdAt.toISOString(),
     };
 
-    return this.generateTokens(formattedUser);
+    const tokens = await this.generateTokens(formattedUser);
+    return { user: formattedUser, ...tokens };
   }
 
   async logout(userId: string, refreshToken?: string): Promise<void> {

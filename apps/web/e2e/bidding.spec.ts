@@ -26,8 +26,9 @@ test.describe('Real-Time Auction & Bidding E2E Workflows', () => {
     // Verify successful registration and navigation to /auctions
     await sellerPage.waitForURL(/\/auctions$/);
 
-    // 2. Seller creates auction at /auctions/create
-    await sellerPage.goto(`${targetUrl}/auctions/create`);
+    // 2. Seller navigates to create auction listing via navbar
+    await sellerPage.getByRole('link', { name: /Create Auction/i }).click();
+    await sellerPage.waitForURL(/\/auctions\/create$/);
     await expect(
       sellerPage.getByRole('heading', { name: /Create New Auction Listing/i }),
     ).toBeVisible();
@@ -105,7 +106,8 @@ test.describe('Real-Time Auction & Bidding E2E Workflows', () => {
     await sellerPage.getByRole('button', { name: /Create Account/i }).click();
     await sellerPage.waitForURL(/\/auctions$/);
 
-    await sellerPage.goto(`${targetUrl}/auctions/create`);
+    await sellerPage.getByRole('link', { name: /Create Auction/i }).click();
+    await sellerPage.waitForURL(/\/auctions\/create$/);
     const auctionTitle = `Collector Stamp Set ${timestamp}`;
     await sellerPage.locator('#title').fill(auctionTitle);
     await sellerPage

@@ -18,7 +18,7 @@ import { LoginDto } from './dto/login.dto.js';
 import { RefreshTokenDto } from './dto/refresh.dto.js';
 import { Public } from '../common/decorators/public.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
-import { ApiResponse, JwtPayload } from '@bidstream/contracts';
+import { ApiResponse, JwtPayload, UserDto } from '@bidstream/contracts';
 import { UsersService } from '../users/users.service.js';
 
 @ApiTags('Auth')
@@ -72,7 +72,7 @@ export class AuthController {
     @Req() req: Request,
     @Body() dto: RefreshTokenDto,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<ApiResponse<{ accessToken: string }>> {
+  ): Promise<ApiResponse<{ user: UserDto; accessToken: string }>> {
     this.verifyOrigin(req);
 
     const token = req.cookies?.refresh_token || dto.refreshToken;
@@ -80,11 +80,11 @@ export class AuthController {
       throw new UnauthorizedException('Refresh token is required');
     }
 
-    const { accessToken, refreshToken } = await this.authService.refreshTokens(token);
+    const { user, accessToken, refreshToken } = await this.authService.refreshTokens(token);
     this.setRefreshTokenCookie(res, refreshToken);
     return {
       success: true,
-      data: { accessToken },
+      data: { user, accessToken },
     };
   }
 
