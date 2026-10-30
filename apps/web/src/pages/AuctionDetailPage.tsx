@@ -184,7 +184,11 @@ export const AuctionDetailPage: React.FC = () => {
   }
 
   const isSeller = user?.id === auction.sellerId;
-  const isWinning = user && liveWinnerId === user.id;
+  const isWinning =
+    user &&
+    (isClosed
+      ? liveWinnerId === user.id
+      : activeBids.length > 0 && activeBids[0]?.bidderId === user.id);
 
   return (
     <div className="space-y-6">
