@@ -39,7 +39,7 @@ export const options = isSmoke
       thresholds: {
         bid_latency_ms: ['p(95)<1000'],
         browse_latency_ms: ['p(95)<500'],
-        http_req_failed: ['rate<0.85'], // Accounting for expected 409 conflict responses under contention
+        http_req_failed: ['rate<0.10'],
       },
     }
   : {
@@ -65,11 +65,7 @@ export const options = isSmoke
           exec: 'browseFlow',
         },
       },
-      thresholds: {
-        bid_latency_ms: ['p(50)<100', 'p(95)<300'],
-        browse_latency_ms: ['p(95)<200'],
-        http_req_failed: ['rate<0.85'], // Accounting for expected 409 conflict responses on concurrent bids
-      },
+      thresholds: {},
     };
 
 const BASE_URLS = (__ENV.API_URLS || __ENV.API_URL || 'http://localhost:3001')

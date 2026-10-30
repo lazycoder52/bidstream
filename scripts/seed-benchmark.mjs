@@ -99,7 +99,7 @@ export async function seedBenchmarkData(prismaClient = null) {
 
     const secret =
       process.env['JWT_ACCESS_SECRET'] ||
-      'change_this_to_a_secure_random_string_at_least_32_characters_long';
+      'dev-only-jwt-access-secret-minimum-32-characters-long';
 
     const tokens = BENCHMARK_BIDDER_IDS.map((bidderId) =>
       generateJwt(
