@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+const booleanEnv = z
+  .union([z.boolean(), z.enum(['true', 'false', '1', '0'])])
+  .transform((v) => v === true || v === 'true' || v === '1')
+  .default(false);
+
 export const EnvSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -8,7 +13,7 @@ export const EnvSchema = z
     REDIS_HOST: z.string().default('localhost'),
     REDIS_PORT: z.coerce.number().default(6379),
     REDIS_PASSWORD: z.string().optional().default(''),
-    REDIS_IN_MEMORY: z.coerce.boolean().default(false),
+    REDIS_IN_MEMORY: booleanEnv,
     JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
     JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
     JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
@@ -16,7 +21,7 @@ export const EnvSchema = z
     CORS_ORIGIN: z.string().default('http://localhost:5173'),
     THROTTLE_TTL: z.coerce.number().default(60),
     THROTTLE_LIMIT: z.coerce.number().default(120),
-    THROTTLE_FAIL_OPEN: z.coerce.boolean().default(false),
+    THROTTLE_FAIL_OPEN: booleanEnv,
   })
   .refine((data) => !(data.NODE_ENV === 'production' && data.REDIS_IN_MEMORY), {
     message: 'REDIS_IN_MEMORY cannot be enabled in production environments',
