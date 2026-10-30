@@ -75,6 +75,8 @@ async function runBenchmarkSuite() {
     requestsPerSecond: 1420.5,
     totalRequests: 99435,
     successfulRequests: 98920,
+    acceptedBids: 80470,
+    rejectedBids: 18450,
     conflictResponses409: 18450,
     errorRatePercent: 0.0,
   };
@@ -114,6 +116,7 @@ async function runBenchmarkSuite() {
       const reqRate = m['http_reqs']?.values?.rate ?? m['http_reqs']?.rate ?? 0;
       const conflicts = m['bids_conflict_409']?.values?.count ?? m['bids_conflict_409']?.count ?? 0;
       const accepted = m['bids_accepted']?.values?.count ?? m['bids_accepted']?.count ?? 0;
+      const rejected = m['bids_rejected']?.values?.count ?? m['bids_rejected']?.count ?? conflicts;
       const bidDur = m['bid_latency_ms']?.values ?? m['bid_latency_ms'];
       const browseDur = m['browse_latency_ms']?.values ?? m['browse_latency_ms'];
 
@@ -121,6 +124,8 @@ async function runBenchmarkSuite() {
         requestsPerSecond: Number(reqRate.toFixed(1)),
         totalRequests: totalReqs,
         successfulRequests: accepted + conflicts,
+        acceptedBids: accepted,
+        rejectedBids: rejected,
         conflictResponses409: conflicts,
         errorRatePercent:
           totalReqs > 0
@@ -200,6 +205,8 @@ async function runBenchmarkSuite() {
   console.log(`\nMetrics successfully saved to: ${outputPath}`);
   console.log('----------------------------------------------------');
   console.log(` Throughput:      ${report.throughput.requestsPerSecond} req/s`);
+  console.log(` Accepted Bids:   ${report.throughput.acceptedBids}`);
+  console.log(` Rejected Bids:   ${report.throughput.rejectedBids}`);
   console.log(` Bid Latency p50: ${report.latencies.httpBidP50Ms} ms`);
   console.log(` Bid Latency p95: ${report.latencies.httpBidP95Ms} ms`);
   console.log(` Socket Delay p95:${report.realtime.broadcastDelayP95Ms} ms`);

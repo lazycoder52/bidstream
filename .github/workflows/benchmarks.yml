@@ -41,8 +41,9 @@ jobs:
       REDIS_PORT: 6379
       REDIS_IN_MEMORY: 'false'
       THROTTLE_FAIL_OPEN: 'true'
-      JWT_ACCESS_SECRET: change_this_to_a_secure_random_string_at_least_32_characters_long
-      JWT_REFRESH_SECRET: change_this_to_another_secure_random_string_at_least_32_chars
+      THROTTLE_LIMIT: 50000
+      JWT_ACCESS_SECRET: dev-only-jwt-access-secret-minimum-32-characters-long
+      JWT_REFRESH_SECRET: dev-only-jwt-refresh-secret-minimum-32-characters-long
       CORS_ORIGIN: http://localhost:5173
 
     steps:

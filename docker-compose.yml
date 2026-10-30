@@ -46,8 +46,8 @@ services:
       REDIS_IN_MEMORY: 'false'
       THROTTLE_FAIL_OPEN: 'false'
       THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
-      JWT_ACCESS_SECRET: production_access_token_secret_must_be_32_characters
-      JWT_REFRESH_SECRET: production_refresh_token_secret_must_be_32_chars
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-only-jwt-access-secret-minimum-32-characters-long}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-only-jwt-refresh-secret-minimum-32-characters-long}
       CORS_ORIGIN: http://localhost:8080,http://localhost:80,http://localhost:5173
     ports:
       - '3001:3001'
