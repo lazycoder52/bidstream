@@ -1,10 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import cookieParser from 'cookie-parser';
+import { ZodValidationPipe } from 'nestjs-zod';
 import { PrismaClient } from '@prisma/client';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthService } from '../src/auth/auth.service';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 
 describe('Idempotency Key Protocol & Replay Engine', () => {
   let app: INestApplication;
@@ -47,6 +50,9 @@ describe('Idempotency Key Protocol & Replay Engine', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
+    app.useGlobalPipes(new ZodValidationPipe());
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
 
     prisma = app.get(PrismaService);
@@ -71,7 +77,10 @@ describe('Idempotency Key Protocol & Replay Engine', () => {
     buyerToken = buyer.accessToken;
     buyerId = buyer.user.id;
 
-    // Create active auction
+    // Create active auction with start time in the past and end time in future
+    const startTime = new Date(Date.now() - 60000).toISOString();
+    const endTime = new Date(Date.now() + 600000).toISOString();
+
     const auctionRes = await request(app.getHttpServer())
       .post('/auctions')
       .set('Authorization', `Bearer ${sellerToken}`)
@@ -80,10 +89,11 @@ describe('Idempotency Key Protocol & Replay Engine', () => {
         description: 'Verifies exact response replay',
         startingPrice: 100,
         minIncrement: 10,
-        endTime: new Date(Date.now() + 600000).toISOString(),
+        startTime,
+        endTime,
       });
 
-    auctionId = auctionRes.body.data.id;
+    auctionId = auctionRes.body?.data?.id;
   });
 
   afterAll(async () => {
