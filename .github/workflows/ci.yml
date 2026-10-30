@@ -116,7 +116,7 @@ jobs:
 
       - name: Verify API and downstream health
         run: |
-          echo "Waiting for services to become healthy..."
+          echo "Waiting for API service to report healthy..."
           for i in {1..30}; do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/health || true)
             echo "Attempt $i: API /health HTTP status = $STATUS"
@@ -134,8 +134,16 @@ jobs:
 
       - name: Verify Web frontend is healthy
         run: |
-          WEB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ || true)
-          echo "Web status = $WEB_STATUS"
+          echo "Waiting for Web service to respond..."
+          for i in {1..15}; do
+            WEB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ || true)
+            echo "Attempt $i: Web status = $WEB_STATUS"
+            if [ "$WEB_STATUS" = "200" ]; then
+              echo "Web container is responding with 200 OK!"
+              break
+            fi
+            sleep 2
+          done
           if [ "$WEB_STATUS" != "200" ]; then
             echo "Web container failed to respond! Dumping logs:"
             docker compose logs web
