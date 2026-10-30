@@ -25,7 +25,7 @@ Under intense load (e.g., 500 concurrent virtual users bidding simultaneously), 
 3. **Pessimistic Row-Level Locking (`SELECT ... FOR UPDATE`) in PostgreSQL**:
    - Begin an interactive transaction with `Read Committed` isolation level.
    - Execute `SELECT * FROM auctions WHERE id = $id FOR UPDATE`.
-   - Subsequent transactions attempting to lock the same row block cleanly in the Postgres lock queue (FIFO ordered by arrival) until the owning transaction commits or aborts.
+   - Subsequent transactions attempting to lock the same row block cleanly in the Postgres lock queue (serialized by a row lock ordered by arrival) until the owning transaction commits or aborts.
    - _Advantage_: Guarantees strictly serialized execution at the row level without retries or abort cascades. Clean lock lifecycle tied directly to the database transaction boundary.
    - _Drawback_: Locks are held for the duration of the transaction; requires transactions to be strictly minimal (pure DB operations, zero external HTTP calls).
 

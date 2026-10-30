@@ -64,7 +64,7 @@ flowchart TD
 
 Full architectural decision records are documented in [`docs/adr/`](docs/adr/):
 
-1. **[ADR-001: Pessimistic Row Locking vs Optimistic Versioning](docs/adr/001-pessimistic-locking-vs-optimistic-versioning.md)**: Under high contention (hundreds of concurrent bids on a closing auction), optimistic locking (`@version` / CAS) causes catastrophic transaction abort cascades and throughput collapse. BidStream uses PostgreSQL `SELECT ... FOR UPDATE` row locks inside `ReadCommitted` interactive transactions, queuing incoming bids in FIFO order with zero aborted retries.
+1. **[ADR-001: Pessimistic Row Locking vs Optimistic Versioning](docs/adr/001-pessimistic-locking-vs-optimistic-versioning.md)**: Under high contention (hundreds of concurrent bids on a closing auction), optimistic locking (`@version` / CAS) causes catastrophic transaction abort cascades and throughput collapse. BidStream uses PostgreSQL `SELECT ... FOR UPDATE` row locks inside `ReadCommitted` interactive transactions, queuing incoming bids serialized by a row lock with zero aborted retries.
 2. **[ADR-002: Idempotency Keys Design](docs/adr/002-idempotency-keys-design.md)**: Network retries from clients are deduplicated via an atomic `idempotency_keys` table inside the transaction boundary, storing and replaying original 201 responses with zero side effects.
 3. **[ADR-003: Double-Layer Closing Architecture](docs/adr/003-closing-architecture-bullmq-and-skip-locked-sweeper.md)**: Auction closing uses BullMQ delayed jobs as the primary millisecond-precision trigger (rescheduled dynamically upon anti-sniping extensions) combined with a periodic 10-second `SKIP LOCKED` database sweeper as a safety net against queue loss.
 4. **[ADR-004: Redis Adapter for Horizontal WebSocket Scaling](docs/adr/004-redis-adapter-horizontal-websocket-scaling.md)**: Real-time event broadcasting scales horizontally across multiple API processes via `@socket.io/redis-adapter`. Clients reconnecting with `lastBidId` replay missed events directly from the append-only `bids` ledger.
@@ -99,7 +99,11 @@ The load benchmark evaluates 500 concurrent virtual users executing a high-concu
 
 ### Web Performance & Bundle Audit (metrics/web.json)
 
-Bundle size measurements were collected via production build analysis of the React 19 single-page application.
+Bundle size measurements were collected via production build analysis of the React 19 single-page application. Route-level code splitting is implemented across all routes (`/auctions`, `/auctions/:id`, `/auctions/create`, `/dashboard`, `/login`, `/register`) using dynamic `React.lazy` imports wrapped with `<Suspense>`, ensuring secondary routes are loaded on demand.
+
+- **Initial-Load JavaScript (gzip)**: **96.1 KB** (`mainIndex` entry chunk transferred over the wire)
+- **Total Initial Transfer (JS + CSS gzip)**: **102.63 KB**
+- **Route-Level Code Splitting**: Confirmed active across all routes with dynamic chunking.
 
 | Metric                      | Measured Value | Gzip Transferred |
 | --------------------------- | -------------- | ---------------- |
