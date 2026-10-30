@@ -1,12 +1,12 @@
 {
-  "commitSha": "cac436de5e0faf2865b48d4a0ce5947f024eecec",
-  "timestamp": "2026-10-30T08:35:31.815Z",
-  "nodeVersion": "v24.14.1",
+  "commitSha": "e69044d22ad26a143c2de2dffb42b6e547a012cd",
+  "timestamp": "2026-10-30T09:01:20.404Z",
+  "nodeVersion": "v22.23.4",
   "runnerSpecs": {
-    "cpuModel": "13th Gen Intel(R) Core(TM) i5-13420H",
-    "cpuCores": 12,
-    "ramMb": 16077,
-    "os": "Windows_NT 10.0.26300 (x64)"
+    "cpuModel": "AMD EPYC 9V45 96-Core Processor",
+    "cpuCores": 2,
+    "ramMb": 7933,
+    "os": "Linux 7.0.0-1017-azure (x64)"
   },
   "serviceVersions": {
     "postgres": "16-alpine",
@@ -46,7 +46,7 @@
     }
   },
   "lighthouse": {
-    "performance": 74,
+    "performance": 73,
     "accessibility": 95,
     "bestPractices": 96,
     "seo": 82

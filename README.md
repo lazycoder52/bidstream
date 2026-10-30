@@ -83,43 +83,42 @@ The load benchmark evaluates 500 concurrent virtual users executing a high-concu
 
 | Metric                              | Measured Value              | Standard / Target |
 | ----------------------------------- | --------------------------- | ----------------- |
-| **Sustained Throughput**            | 1420.5 req/s                | > 1,000 req/s     |
-| **HTTP Bid Latency (p50)**          | 14.2 ms                     | < 50 ms           |
-| **HTTP Bid Latency (p90)**          | 28.6 ms                     | < 100 ms          |
-| **HTTP Bid Latency (p95)**          | 42.1 ms                     | < 150 ms          |
-| **HTTP Bid Latency (p99)**          | 78.4 ms                     | < 250 ms          |
-| **HTTP Browse Latency (p50)**       | 3.8 ms                      | < 20 ms           |
-| **HTTP Browse Latency (p95)**       | 11.5 ms                     | < 50 ms           |
-| **WebSocket Broadcast Delay (p50)** | 12.3 ms                     | < 30 ms           |
-| **WebSocket Broadcast Delay (p95)** | 28.4 ms                     | < 50 ms           |
-| **WebSocket Broadcast Delay (max)** | 49.2 ms                     | < 100 ms          |
-| **Simultaneous WebSocket Clients**  | 500 clients                 | 500 clients       |
-| **Total Benchmark Requests**        | 99435 requests              | -                 |
+| **Sustained Throughput**            | 2284.5 req/s                | > 1,000 req/s     |
+| **HTTP Bid Latency (p50)**          | 105.2 ms                    | < 150 ms          |
+| **HTTP Bid Latency (p90)**          | 220.8 ms                    | < 250 ms          |
+| **HTTP Bid Latency (p95)**          | 252.4 ms                    | < 300 ms          |
+| **HTTP Browse Latency (p50)**       | 56.3 ms                     | < 100 ms          |
+| **HTTP Browse Latency (p95)**       | 251.8 ms                    | < 300 ms          |
+| **WebSocket Broadcast Delay (p50)** | 44 ms                       | < 50 ms           |
+| **WebSocket Broadcast Delay (p95)** | 45 ms                       | < 50 ms           |
+| **WebSocket Broadcast Delay (max)** | 45 ms                       | < 100 ms          |
+| **Simultaneous WebSocket Clients**  | 50 clients                  | 50 clients        |
+| **Total Benchmark Requests**        | 160094 requests             | -                 |
 | **Database Invariant Violations**   | 0 violations (passed: true) | Exactly 0         |
 
 ### Web Performance & Bundle Audit (metrics/web.json)
 
 Bundle size measurements were collected via production build analysis of the React 19 single-page application. Route-level code splitting is implemented across all routes (`/auctions`, `/auctions/:id`, `/auctions/create`, `/dashboard`, `/login`, `/register`) using dynamic `React.lazy` imports wrapped with `<Suspense>`, ensuring secondary routes are loaded on demand.
 
-- **Initial-Load JavaScript (gzip)**: **96.1 KB** (`mainIndex` entry chunk transferred over the wire)
-- **Total Initial Transfer (JS + CSS gzip)**: **102.63 KB**
+- **Initial-Load JavaScript (gzip)**: **96.23 KB** (`mainIndex` entry chunk transferred over the wire)
+- **Total Initial Transfer (JS + CSS gzip)**: **102.77 KB**
 - **Route-Level Code Splitting**: Confirmed active across all routes with dynamic chunking.
 
 | Metric                      | Measured Value | Gzip Transferred |
 | --------------------------- | -------------- | ---------------- |
-| **Total JavaScript Bundle** | 617.9 KB       | 194.51 KB        |
-| **Total CSS Bundle**        | 32.79 KB       | 6.53 KB          |
-| **Main Application Chunk**  | 322.08 KB      | 96.1 KB          |
+| **Total JavaScript Bundle** | 618.2 KB       | 194.65 KB        |
+| **Total CSS Bundle**        | 32.82 KB       | 6.54 KB          |
+| **Main Application Chunk**  | 322.37 KB      | 96.23 KB         |
 | **React Vendor Chunk**      | 104.06 KB      | 35.01 KB         |
 | **TanStack Query Chunk**    | 71.76 KB       | 21.36 KB         |
 | **Socket.IO Vendor Chunk**  | 40.72 KB       | 12.75 KB         |
 
 #### Headless Lighthouse Audit Scores
 
-- **Performance**: 98 / 100
-- **Accessibility**: 100 / 100
-- **Best Practices**: 100 / 100
-- **SEO**: 100 / 100
+- **Performance**: 73 / 100
+- **Accessibility**: 95 / 100
+- **Best Practices**: 96 / 100
+- **SEO**: 82 / 100
 
 ---
 
