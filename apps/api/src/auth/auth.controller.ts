@@ -151,9 +151,10 @@ export class AuthController {
   }
 
   private setRefreshTokenCookie(res: Response, token: string) {
+    const isSecure = process.env['COOKIE_SECURE'] === 'true';
     res.cookie('refresh_token', token, {
       httpOnly: true,
-      secure: process.env['NODE_ENV'] === 'production',
+      secure: isSecure,
       sameSite: 'strict',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days

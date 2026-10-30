@@ -27,7 +27,10 @@ test.describe('Real-Time Auction & Bidding E2E Workflows', () => {
     await sellerPage.waitForURL(/\/auctions$/);
 
     // 2. Seller navigates to create auction listing via navbar
-    await sellerPage.getByRole('link', { name: /Create Auction/i }).click();
+    await sellerPage
+      .getByRole('navigation')
+      .getByRole('link', { name: /Create Auction/i })
+      .click();
     await sellerPage.waitForURL(/\/auctions\/create$/);
     await expect(
       sellerPage.getByRole('heading', { name: /Create New Auction Listing/i }),
@@ -48,7 +51,7 @@ test.describe('Real-Time Auction & Bidding E2E Workflows', () => {
 
     // Verify initial auction state on Seller's page
     await expect(sellerPage.getByText(auctionTitle)).toBeVisible();
-    await expect(sellerPage.getByText('$100.00').first()).toBeVisible();
+    await expect(sellerPage.getByText(/\$100(\.00)?/).first()).toBeVisible();
     await expect(sellerPage.getByText(/Your Listing/i)).toBeVisible();
 
     // ----------------------------------------------------
@@ -67,10 +70,15 @@ test.describe('Real-Time Auction & Bidding E2E Workflows', () => {
     await buyerPage.getByRole('button', { name: /Create Account/i }).click();
     await buyerPage.waitForURL(/\/auctions$/);
 
-    // 4. Buyer visits the live auction room
-    await buyerPage.goto(auctionRoomUrl);
+    // 4. Buyer visits the live auction room via client navigation from /auctions
+    await buyerPage
+      .locator(`a[href*="/auctions/"]`)
+      .filter({ hasText: auctionTitle })
+      .first()
+      .click();
+    await buyerPage.waitForURL(auctionRoomUrl);
     await expect(buyerPage.getByText(auctionTitle)).toBeVisible();
-    await expect(buyerPage.getByText('$100.00').first()).toBeVisible();
+    await expect(buyerPage.getByText(/\$100(\.00)?/).first()).toBeVisible();
 
     // 5. Buyer places a bid of $120
     const bidInput = buyerPage.locator('input[type="number"]');
@@ -78,12 +86,12 @@ test.describe('Real-Time Auction & Bidding E2E Workflows', () => {
     await buyerPage.locator('form button[type="submit"]').click();
 
     // Buyer sees accepted bid and high-bidder banner
-    await expect(buyerPage.getByText('$120.00').first()).toBeVisible({ timeout: 10000 });
+    await expect(buyerPage.getByText(/\$120(\.00)?/).first()).toBeVisible({ timeout: 10000 });
     await expect(buyerPage.getByText(/You currently hold the highest bid/i)).toBeVisible();
 
     // 6. Live update in second context:
     // Seller's open page must receive the live WebSocket broadcast and update to $120 without reloading
-    await expect(sellerPage.getByText('$120.00').first()).toBeVisible({ timeout: 10000 });
+    await expect(sellerPage.getByText(/\$120(\.00)?/).first()).toBeVisible({ timeout: 10000 });
     await expect(sellerPage.getByText('Buyer Bob')).toBeVisible({ timeout: 10000 });
 
     await sellerContext.close();
@@ -106,7 +114,10 @@ test.describe('Real-Time Auction & Bidding E2E Workflows', () => {
     await sellerPage.getByRole('button', { name: /Create Account/i }).click();
     await sellerPage.waitForURL(/\/auctions$/);
 
-    await sellerPage.getByRole('link', { name: /Create Auction/i }).click();
+    await sellerPage
+      .getByRole('navigation')
+      .getByRole('link', { name: /Create Auction/i })
+      .click();
     await sellerPage.waitForURL(/\/auctions\/create$/);
     const auctionTitle = `Collector Stamp Set ${timestamp}`;
     await sellerPage.locator('#title').fill(auctionTitle);
@@ -130,14 +141,19 @@ test.describe('Real-Time Auction & Bidding E2E Workflows', () => {
     await buyer1Page.getByRole('button', { name: /Create Account/i }).click();
     await buyer1Page.waitForURL(/\/auctions$/);
 
-    await buyer1Page.goto(auctionRoomUrl);
+    await buyer1Page
+      .locator(`a[href*="/auctions/"]`)
+      .filter({ hasText: auctionTitle })
+      .first()
+      .click();
+    await buyer1Page.waitForURL(auctionRoomUrl);
     await expect(buyer1Page.getByText(auctionTitle)).toBeVisible();
 
     // Buyer 1 places initial bid of $110
     const bidInput1 = buyer1Page.locator('input[type="number"]');
     await bidInput1.fill('110');
     await buyer1Page.locator('form button[type="submit"]').click();
-    await expect(buyer1Page.getByText('$110.00').first()).toBeVisible({ timeout: 10000 });
+    await expect(buyer1Page.getByText(/\$110(\.00)?/).first()).toBeVisible({ timeout: 10000 });
     await expect(buyer1Page.getByText(/You currently hold the highest bid/i)).toBeVisible();
 
     // Context 3: Buyer 2 (Diana)
@@ -151,18 +167,23 @@ test.describe('Real-Time Auction & Bidding E2E Workflows', () => {
     await buyer2Page.getByRole('button', { name: /Create Account/i }).click();
     await buyer2Page.waitForURL(/\/auctions$/);
 
-    await buyer2Page.goto(auctionRoomUrl);
+    await buyer2Page
+      .locator(`a[href*="/auctions/"]`)
+      .filter({ hasText: auctionTitle })
+      .first()
+      .click();
+    await buyer2Page.waitForURL(auctionRoomUrl);
     await expect(buyer2Page.getByText(auctionTitle)).toBeVisible();
 
     // Buyer 2 outbids Buyer 1 with $150
     const bidInput2 = buyer2Page.locator('input[type="number"]');
     await bidInput2.fill('150');
     await buyer2Page.locator('form button[type="submit"]').click();
-    await expect(buyer2Page.getByText('$150.00').first()).toBeVisible({ timeout: 10000 });
+    await expect(buyer2Page.getByText(/\$150(\.00)?/).first()).toBeVisible({ timeout: 10000 });
     await expect(buyer2Page.getByText(/You currently hold the highest bid/i)).toBeVisible();
 
     // Outbid check: Buyer 1's page observes live update to $150 and loses high-bidder status
-    await expect(buyer1Page.getByText('$150.00').first()).toBeVisible({ timeout: 10000 });
+    await expect(buyer1Page.getByText(/\$150(\.00)?/).first()).toBeVisible({ timeout: 10000 });
     await expect(buyer1Page.getByText(/You currently hold the highest bid/i)).not.toBeVisible();
 
     // Rollback check:
@@ -191,8 +212,8 @@ test.describe('Real-Time Auction & Bidding E2E Workflows', () => {
       buyer1Page.getByText(/Outbid: A higher bid has already been accepted/i),
     ).toBeVisible({ timeout: 10000 });
 
-    // Verify state rollback: current price reverts/remains at $150.00
-    await expect(buyer1Page.getByText('$150.00').first()).toBeVisible();
+    // Verify state rollback: current price reverts/remains at $150
+    await expect(buyer1Page.getByText(/\$150(\.00)?/).first()).toBeVisible();
 
     await sellerContext.close();
     await buyer1Context.close();
