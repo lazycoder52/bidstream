@@ -183,10 +183,11 @@ export const AuctionDetailPage: React.FC = () => {
     );
   }
 
+  const isAuctionClosed = liveIsClosed || auction.status === 'ENDED';
   const isSeller = user?.id === auction.sellerId;
   const isWinning =
     user &&
-    (isClosed
+    (isAuctionClosed
       ? liveWinnerId === user.id
       : activeBids.length > 0 && activeBids[0]?.bidderId === user.id);
 
