@@ -68,7 +68,20 @@ export class BidsService {
       // 2. Execute single atomic transaction with row-level pessimistic locking
       const txResult: BidTxResult = await this.prisma.$transaction(
         async (tx) => {
-          // Double-check idempotency key inside transaction
+          // Lock auction row with SELECT ... FOR UPDATE
+          const rows = await tx.$queryRaw<LockedAuction[]>`
+            SELECT id, status, current_price, min_increment, end_time, seller_id, winner_id, bid_count, version
+            FROM auctions
+            WHERE id = ${auctionId}::uuid
+            FOR UPDATE;
+          `;
+
+          const auction = rows[0];
+          if (!auction) {
+            throw new NotFoundException(`Auction with ID ${auctionId} not found`);
+          }
+
+          // Double-check idempotency key inside transaction AFTER acquiring auction lock
           if (idempotencyKey) {
             const existingInTx = await tx.idempotencyKey.findUnique({
               where: { key: idempotencyKey },
@@ -81,19 +94,6 @@ export class BidsService {
                 previousPrice: 0,
               };
             }
-          }
-
-          // Lock auction row with SELECT ... FOR UPDATE
-          const rows = await tx.$queryRaw<LockedAuction[]>`
-            SELECT id, status, current_price, min_increment, end_time, seller_id, winner_id, bid_count, version
-            FROM auctions
-            WHERE id = ${auctionId}::uuid
-            FOR UPDATE;
-          `;
-
-          const auction = rows[0];
-          if (!auction) {
-            throw new NotFoundException(`Auction with ID ${auctionId} not found`);
           }
 
           if (auction.status !== 'ACTIVE') {
@@ -176,15 +176,37 @@ export class BidsService {
 
           // Persist idempotency key inside the transaction
           if (idempotencyKey) {
-            await tx.idempotencyKey.create({
-              data: {
-                key: idempotencyKey,
-                target: `POST /auctions/${auctionId}/bids`,
-                responseStatus: 201,
-                responseBody: bidResult as unknown as Prisma.InputJsonValue,
-                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-              },
-            });
+            try {
+              await tx.idempotencyKey.create({
+                data: {
+                  key: idempotencyKey,
+                  target: `POST /auctions/${auctionId}/bids`,
+                  responseStatus: 201,
+                  responseBody: bidResult as unknown as Prisma.InputJsonValue,
+                  expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+                },
+              });
+            } catch (createErr: unknown) {
+              if (
+                typeof createErr === 'object' &&
+                createErr !== null &&
+                'code' in createErr &&
+                (createErr as { code: string }).code === 'P2002'
+              ) {
+                const racedKey = await tx.idempotencyKey.findUnique({
+                  where: { key: idempotencyKey },
+                });
+                if (racedKey) {
+                  return {
+                    bidResult: racedKey.responseBody as unknown as PlaceBidResult,
+                    isNewBid: false,
+                    previousHighestBidderId: null,
+                    previousPrice: 0,
+                  };
+                }
+              }
+              throw createErr;
+            }
           }
 
           return {

@@ -197,4 +197,84 @@ describe('High-Concurrency Bidding Engine (Real PostgreSQL)', () => {
     const duplicateBidsInDb = savedBids.filter((b) => b.amount === firstFulfilledVal?.bid?.amount);
     expect(duplicateBidsInDb).toHaveLength(1);
   }, 45000);
+
+  it('correctly handles 20 concurrent parallel requests with the identical idempotency key', async () => {
+    if (!isPostgresAvailable) {
+      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
+        throw new Error(
+          'Real PostgreSQL is required in CI for concurrent idempotency test, but was not available.',
+        );
+      }
+      expect(true).toBe(true);
+      return;
+    }
+
+    const testAuction = await prisma.auction.create({
+      data: {
+        title: `Concurrent Idempotent Auction ${testSuffix}`,
+        description: 'Asserting exact replay and single price increment under parallel fire',
+        startingPrice: 50,
+        currentPrice: 50,
+        minIncrement: 5,
+        status: 'ACTIVE',
+        sellerId,
+        startTime: new Date(Date.now() - 60000),
+        endTime: new Date(Date.now() + 3600000),
+      },
+    });
+
+    const parallelIdempotencyKey = `parallel-key-${testSuffix}-${Date.now()}`;
+    const bidderId = bidderIds[0]!;
+    const PARALLEL_REQUEST_COUNT = 20;
+    const bidAmount = 60;
+
+    // Fire 20 simultaneous identical requests with the SAME Idempotency-Key
+    const requests = Array.from({ length: PARALLEL_REQUEST_COUNT }, () =>
+      bidsService
+        .placeBid(testAuction.id, bidderId, { amount: bidAmount }, parallelIdempotencyKey)
+        .then((res) => ({ status: 'fulfilled' as const, value: res }))
+        .catch((err) => ({ status: 'rejected' as const, reason: err })),
+    );
+
+    const results = await Promise.all(requests);
+
+    // 1. Assert all 20 requests succeeded
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    expect(fulfilled).toHaveLength(PARALLEL_REQUEST_COUNT);
+
+    // 2. Assert all responses return the exact same stored response
+    const firstResponse = fulfilled[0]!.value;
+    for (const res of fulfilled) {
+      expect(res.value.bid.id).toBe(firstResponse.bid.id);
+      expect(res.value.bid.amount).toBe(firstResponse.bid.amount);
+      expect(res.value.bid.bidderId).toBe(bidderId);
+      expect(new Date(res.value.bid.createdAt).getTime()).toBe(
+        new Date(firstResponse.bid.createdAt).getTime(),
+      );
+      expect(res.value.currentPrice).toBe(bidAmount);
+      expect(res.value.bidCount).toBe(1);
+    }
+
+    // 3. Assert exactly one bid row is created for that key
+    const bidsInDb = await prisma.bid.findMany({
+      where: { auctionId: testAuction.id },
+    });
+    expect(bidsInDb).toHaveLength(1);
+    expect(bidsInDb[0]!.id).toBe(firstResponse.bid.id);
+    expect(bidsInDb[0]!.amount).toBe(bidAmount);
+
+    // 4. Assert currentPrice moves exactly once (from 50 to 60)
+    const finalAuctionState = await prisma.auction.findUniqueOrThrow({
+      where: { id: testAuction.id },
+    });
+    expect(finalAuctionState.currentPrice).toBe(bidAmount);
+    expect(finalAuctionState.bidCount).toBe(1);
+
+    // Clean up test auction data
+    await prisma.bid.deleteMany({ where: { auctionId: testAuction.id } });
+    await prisma.idempotencyKey.deleteMany({
+      where: { target: `POST /auctions/${testAuction.id}/bids` },
+    });
+    await prisma.auction.delete({ where: { id: testAuction.id } }).catch(() => {});
+  }, 30000);
 });
