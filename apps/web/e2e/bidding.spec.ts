@@ -1,276 +1,199 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Real-Time Auction & Bidding E2E Workflows', () => {
-  const auctionId = '11111111-2222-3333-4444-555555555555';
-  let currentAuctionPrice = 100;
-  let currentBidCount = 0;
-  const bidsHistory: Array<{
-    id: string;
-    auctionId: string;
-    bidderId: string;
-    bidderName: string;
-    amount: number;
-    createdAt: string;
-  }> = [];
-
-  test.beforeEach(() => {
-    currentAuctionPrice = 100;
-    currentBidCount = 0;
-    bidsHistory.length = 0;
-  });
-
-  test('two browser contexts: register, create, bid, observe real-time update, outbid and rollback', async ({
+  test('Flow 1: register, create, bid, live update in a second context', async ({
     browser,
+    baseURL,
   }) => {
+    const targetUrl = baseURL || 'http://localhost:8080';
+
     // ----------------------------------------------------
     // Context 1: Seller (User A)
     // ----------------------------------------------------
-    const context1 = await browser.newContext();
-    const page1 = await context1.newPage();
+    const sellerContext = await browser.newContext();
+    const sellerPage = await sellerContext.newPage();
+    const timestamp = Date.now();
+    const sellerEmail = `seller-${timestamp}@example.com`;
 
-    // Mock API routes for Context 1
-    await page1.route('**/api/auth/register', async (route) => {
-      await route.fulfill({
-        status: 201,
-        json: {
-          accessToken: 'mock-seller-token',
-          user: {
-            id: 'seller-id-1',
-            email: 'seller@example.com',
-            name: 'Seller Alice',
-            role: 'SELLER',
-          },
-        },
-      });
-    });
+    // 1. Seller registers
+    await sellerPage.goto(`${targetUrl}/register`);
+    await sellerPage.locator('#name').fill('Seller Alice');
+    await sellerPage.locator('#email').fill(sellerEmail);
+    await sellerPage.locator('#password').fill('Password123!');
+    await sellerPage.locator('#role').selectOption('SELLER');
+    await sellerPage.getByRole('button', { name: /Create Account/i }).click();
 
-    await page1.route('**/api/auctions', async (route) => {
-      if (route.request().method() === 'POST') {
-        currentAuctionPrice = 100;
-        await route.fulfill({
-          status: 201,
-          json: {
-            id: auctionId,
-            title: 'Vintage Chronograph Watch',
-            description: 'Rare collectors piece in mint condition',
-            startingPrice: 100,
-            currentPrice: 100,
-            minIncrement: 10,
-            status: 'ACTIVE',
-            startTime: new Date().toISOString(),
-            endTime: new Date(Date.now() + 600000).toISOString(),
-            sellerId: 'seller-id-1',
-            sellerName: 'Seller Alice',
-            bidCount: currentBidCount,
-            winnerId: null,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
-        });
-      } else {
-        await route.fulfill({
-          status: 200,
-          json: {
-            items: [
-              {
-                id: auctionId,
-                title: 'Vintage Chronograph Watch',
-                description: 'Rare collectors piece in mint condition',
-                startingPrice: 100,
-                currentPrice: currentAuctionPrice,
-                minIncrement: 10,
-                status: 'ACTIVE',
-                startTime: new Date().toISOString(),
-                endTime: new Date(Date.now() + 600000).toISOString(),
-                sellerId: 'seller-id-1',
-                sellerName: 'Seller Alice',
-                bidCount: currentBidCount,
-                winnerId: null,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-              },
-            ],
-            total: 1,
-            page: 1,
-            limit: 20,
-            totalPages: 1,
-          },
-        });
-      }
-    });
+    // Verify successful registration and navigation to /auctions
+    await sellerPage.waitForURL(/\/auctions$/);
 
-    await page1.route(`**/api/auctions/${auctionId}`, async (route) => {
-      await route.fulfill({
-        status: 200,
-        json: {
-          id: auctionId,
-          title: 'Vintage Chronograph Watch',
-          description: 'Rare collectors piece in mint condition',
-          startingPrice: 100,
-          currentPrice: currentAuctionPrice,
-          minIncrement: 10,
-          status: 'ACTIVE',
-          startTime: new Date().toISOString(),
-          endTime: new Date(Date.now() + 600000).toISOString(),
-          sellerId: 'seller-id-1',
-          sellerName: 'Seller Alice',
-          bidCount: currentBidCount,
-          winnerId: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      });
-    });
+    // 2. Seller creates auction at /auctions/create
+    await sellerPage.goto(`${targetUrl}/auctions/create`);
+    await expect(
+      sellerPage.getByRole('heading', { name: /Create New Auction Listing/i }),
+    ).toBeVisible();
 
-    await page1.route(`**/api/auctions/${auctionId}/bids`, async (route) => {
-      if (route.request().method() === 'GET') {
-        await route.fulfill({ status: 200, json: bidsHistory });
-      }
-    });
+    const auctionTitle = `Vintage Chronograph Watch ${timestamp}`;
+    await sellerPage.locator('#title').fill(auctionTitle);
+    await sellerPage
+      .locator('#description')
+      .fill('Rare collectors timepiece with certified provenance and box.');
+    await sellerPage.locator('#startingPrice').fill('100');
+    await sellerPage.locator('#minIncrement').fill('10');
+    await sellerPage.getByRole('button', { name: /Publish Listing/i }).click();
 
-    // Seller registers
-    await page1.goto('/register');
-    await page1.getByLabel(/Full Name/i).fill('Seller Alice');
-    await page1.getByLabel(/Email/i).fill('seller@example.com');
-    await page1.getByLabel(/Password/i).fill('Password123!');
-    await page1.getByRole('button', { name: /Create Account/i }).click();
+    // Redirection to the live auction room
+    await sellerPage.waitForURL(/\/auctions\/[a-f0-9-]+$/);
+    const auctionRoomUrl = sellerPage.url();
 
-    // Seller creates auction
-    await page1.goto('/create');
-    await expect(page1.getByRole('heading', { name: /List New Auction/i })).toBeVisible();
-    await page1.getByLabel(/Item Title/i).fill('Vintage Chronograph Watch');
-    await page1.getByLabel(/Description/i).fill('Rare collectors piece in mint condition');
-    await page1.getByLabel(/Starting Price/i).fill('100');
-    await page1.getByLabel(/Minimum Bid Increment/i).fill('10');
-    await page1.getByRole('button', { name: /Publish Auction/i }).click();
-
-    // Navigate to auction detail room
-    await page1.goto(`/auctions/${auctionId}`);
-    await expect(page1.getByText('Vintage Chronograph Watch')).toBeVisible();
+    // Verify initial auction state on Seller's page
+    await expect(sellerPage.getByText(auctionTitle)).toBeVisible();
+    await expect(sellerPage.getByText('$100.00').first()).toBeVisible();
+    await expect(sellerPage.getByText(/Your Listing/i)).toBeVisible();
 
     // ----------------------------------------------------
     // Context 2: Buyer (User B)
     // ----------------------------------------------------
-    const context2 = await browser.newContext();
-    const page2 = await context2.newPage();
+    const buyerContext = await browser.newContext();
+    const buyerPage = await buyerContext.newPage();
+    const buyerEmail = `buyer-${timestamp}@example.com`;
 
-    await page2.route('**/api/auth/login', async (route) => {
-      await route.fulfill({
-        status: 200,
-        json: {
-          accessToken: 'mock-buyer-token',
-          user: {
-            id: 'buyer-id-2',
-            email: 'buyer@example.com',
-            name: 'Buyer Bob',
-            role: 'BUYER',
-          },
-        },
-      });
-    });
+    // 3. Buyer registers
+    await buyerPage.goto(`${targetUrl}/register`);
+    await buyerPage.locator('#name').fill('Buyer Bob');
+    await buyerPage.locator('#email').fill(buyerEmail);
+    await buyerPage.locator('#password').fill('Password123!');
+    await buyerPage.locator('#role').selectOption('BUYER');
+    await buyerPage.getByRole('button', { name: /Create Account/i }).click();
+    await buyerPage.waitForURL(/\/auctions$/);
 
-    await page2.route(`**/api/auctions/${auctionId}`, async (route) => {
-      await route.fulfill({
-        status: 200,
-        json: {
-          id: auctionId,
-          title: 'Vintage Chronograph Watch',
-          description: 'Rare collectors piece in mint condition',
-          startingPrice: 100,
-          currentPrice: currentAuctionPrice,
-          minIncrement: 10,
-          status: 'ACTIVE',
-          startTime: new Date().toISOString(),
-          endTime: new Date(Date.now() + 600000).toISOString(),
-          sellerId: 'seller-id-1',
-          sellerName: 'Seller Alice',
-          bidCount: currentBidCount,
-          winnerId: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      });
-    });
+    // 4. Buyer visits the live auction room
+    await buyerPage.goto(auctionRoomUrl);
+    await expect(buyerPage.getByText(auctionTitle)).toBeVisible();
+    await expect(buyerPage.getByText('$100.00').first()).toBeVisible();
 
-    await page2.route(`**/api/auctions/${auctionId}/bids`, async (route) => {
-      if (route.request().method() === 'GET') {
-        await route.fulfill({ status: 200, json: bidsHistory });
-      } else if (route.request().method() === 'POST') {
-        const body = JSON.parse(route.request().postData() || '{}');
-        const amount = Number(body.amount);
+    // 5. Buyer places a bid of $120
+    const bidInput = buyerPage.locator('input[type="number"]');
+    await bidInput.fill('120');
+    await buyerPage.locator('form button[type="submit"]').click();
 
-        // Conflict check: if amount is below minimum increment, return 409
-        if (amount < currentAuctionPrice + 10) {
-          await route.fulfill({
-            status: 409,
-            json: {
-              success: false,
-              statusCode: 409,
-              message: `Bid amount $${amount} is below the minimum required increment`,
-              timestamp: new Date().toISOString(),
-            },
-          });
-          return;
-        }
+    // Buyer sees accepted bid and high-bidder banner
+    await expect(buyerPage.getByText('$120.00').first()).toBeVisible({ timeout: 10000 });
+    await expect(buyerPage.getByText(/You currently hold the highest bid/i)).toBeVisible();
 
-        // Accept bid
-        currentAuctionPrice = amount;
-        currentBidCount++;
-        const newBid = {
-          id: `bid-e2e-${currentBidCount}`,
-          auctionId,
-          bidderId: 'buyer-id-2',
-          bidderName: 'Buyer Bob',
-          amount,
-          createdAt: new Date().toISOString(),
-        };
-        bidsHistory.unshift(newBid);
+    // 6. Live update in second context:
+    // Seller's open page must receive the live WebSocket broadcast and update to $120 without reloading
+    await expect(sellerPage.getByText('$120.00').first()).toBeVisible({ timeout: 10000 });
+    await expect(sellerPage.getByText('Buyer Bob')).toBeVisible({ timeout: 10000 });
 
+    await sellerContext.close();
+    await buyerContext.close();
+  });
+
+  test('Flow 2: outbid and rollback', async ({ browser, baseURL }) => {
+    const targetUrl = baseURL || 'http://localhost:8080';
+
+    // Context 1: Seller creates listing
+    const sellerContext = await browser.newContext();
+    const sellerPage = await sellerContext.newPage();
+    const timestamp = Date.now();
+
+    await sellerPage.goto(`${targetUrl}/register`);
+    await sellerPage.locator('#name').fill('Seller Sam');
+    await sellerPage.locator('#email').fill(`seller-sam-${timestamp}@example.com`);
+    await sellerPage.locator('#password').fill('Password123!');
+    await sellerPage.locator('#role').selectOption('SELLER');
+    await sellerPage.getByRole('button', { name: /Create Account/i }).click();
+    await sellerPage.waitForURL(/\/auctions$/);
+
+    await sellerPage.goto(`${targetUrl}/auctions/create`);
+    const auctionTitle = `Collector Stamp Set ${timestamp}`;
+    await sellerPage.locator('#title').fill(auctionTitle);
+    await sellerPage
+      .locator('#description')
+      .fill('Original 19th century historical postage stamps.');
+    await sellerPage.locator('#startingPrice').fill('100');
+    await sellerPage.locator('#minIncrement').fill('10');
+    await sellerPage.getByRole('button', { name: /Publish Listing/i }).click();
+    await sellerPage.waitForURL(/\/auctions\/[a-f0-9-]+$/);
+    const auctionRoomUrl = sellerPage.url();
+
+    // Context 2: Buyer 1 (Charlie)
+    const buyer1Context = await browser.newContext();
+    const buyer1Page = await buyer1Context.newPage();
+    await buyer1Page.goto(`${targetUrl}/register`);
+    await buyer1Page.locator('#name').fill('Buyer Charlie');
+    await buyer1Page.locator('#email').fill(`buyer-charlie-${timestamp}@example.com`);
+    await buyer1Page.locator('#password').fill('Password123!');
+    await buyer1Page.locator('#role').selectOption('BUYER');
+    await buyer1Page.getByRole('button', { name: /Create Account/i }).click();
+    await buyer1Page.waitForURL(/\/auctions$/);
+
+    await buyer1Page.goto(auctionRoomUrl);
+    await expect(buyer1Page.getByText(auctionTitle)).toBeVisible();
+
+    // Buyer 1 places initial bid of $110
+    const bidInput1 = buyer1Page.locator('input[type="number"]');
+    await bidInput1.fill('110');
+    await buyer1Page.locator('form button[type="submit"]').click();
+    await expect(buyer1Page.getByText('$110.00').first()).toBeVisible({ timeout: 10000 });
+    await expect(buyer1Page.getByText(/You currently hold the highest bid/i)).toBeVisible();
+
+    // Context 3: Buyer 2 (Diana)
+    const buyer2Context = await browser.newContext();
+    const buyer2Page = await buyer2Context.newPage();
+    await buyer2Page.goto(`${targetUrl}/register`);
+    await buyer2Page.locator('#name').fill('Buyer Diana');
+    await buyer2Page.locator('#email').fill(`buyer-diana-${timestamp}@example.com`);
+    await buyer2Page.locator('#password').fill('Password123!');
+    await buyer2Page.locator('#role').selectOption('BUYER');
+    await buyer2Page.getByRole('button', { name: /Create Account/i }).click();
+    await buyer2Page.waitForURL(/\/auctions$/);
+
+    await buyer2Page.goto(auctionRoomUrl);
+    await expect(buyer2Page.getByText(auctionTitle)).toBeVisible();
+
+    // Buyer 2 outbids Buyer 1 with $150
+    const bidInput2 = buyer2Page.locator('input[type="number"]');
+    await bidInput2.fill('150');
+    await buyer2Page.locator('form button[type="submit"]').click();
+    await expect(buyer2Page.getByText('$150.00').first()).toBeVisible({ timeout: 10000 });
+    await expect(buyer2Page.getByText(/You currently hold the highest bid/i)).toBeVisible();
+
+    // Outbid check: Buyer 1's page observes live update to $150 and loses high-bidder status
+    await expect(buyer1Page.getByText('$150.00').first()).toBeVisible({ timeout: 10000 });
+    await expect(buyer1Page.getByText(/You currently hold the highest bid/i)).not.toBeVisible();
+
+    // Rollback check:
+    // Intercept Buyer 1's next bid submission to simulate server rejection / 409 Conflict
+    await buyer1Page.route('**/api/auctions/*/bids', async (route) => {
+      if (route.request().method() === 'POST') {
         await route.fulfill({
-          status: 201,
-          json: {
-            bid: newBid,
-            currentPrice: currentAuctionPrice,
-            bidCount: currentBidCount,
-            endTime: new Date(Date.now() + 600000).toISOString(),
-            extended: false,
-          },
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            statusCode: 409,
+            message: 'Outbid: A higher bid has already been accepted.',
+          }),
         });
+      } else {
+        await route.continue();
       }
     });
 
-    // Buyer logs in
-    await page2.goto('/login');
-    await page2.getByLabel(/Email/i).fill('buyer@example.com');
-    await page2.getByLabel(/Password/i).fill('Password123!');
-    await page2.getByRole('button', { name: /Sign In/i }).click();
+    // Buyer 1 attempts a bid of $160
+    await bidInput1.fill('160');
+    await buyer1Page.locator('form button[type="submit"]').click();
 
-    // Buyer visits the auction room
-    await page2.goto(`/auctions/${auctionId}`);
-    await expect(page2.getByText('Vintage Chronograph Watch')).toBeVisible();
-
-    // Buyer places valid bid of $120
-    const bidInput = page2.getByPlaceholder(/Enter custom amount/i);
-    await bidInput.fill('120');
-    await page2.getByRole('button', { name: /Place Bid/i }).click();
-
-    // Assert Context 2 observes accepted high bid
-    await expect(page2.getByText('$120')).toBeVisible();
-
-    // ----------------------------------------------------
-    // Assert Conflict & Rollback in Context 2
-    // ----------------------------------------------------
-    // Buyer attempts an invalid bid below required increment (e.g. $110 while price is $120)
-    await bidInput.fill('110');
-    await page2.getByRole('button', { name: /Place Bid/i }).click();
-
-    // Assert error message/announcement is visible on screen
+    // Verify error notification is displayed
     await expect(
-      page2.getByText(/below the minimum required increment|Bid placement failed/i),
-    ).toBeVisible();
+      buyer1Page.getByText(/Outbid: A higher bid has already been accepted/i),
+    ).toBeVisible({ timeout: 10000 });
 
-    // Clean up
-    await context1.close();
-    await context2.close();
+    // Verify state rollback: current price reverts/remains at $150.00
+    await expect(buyer1Page.getByText('$150.00').first()).toBeVisible();
+
+    await sellerContext.close();
+    await buyer1Context.close();
+    await buyer2Context.close();
   });
 });

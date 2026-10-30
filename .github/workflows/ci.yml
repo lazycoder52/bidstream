@@ -166,3 +166,75 @@ jobs:
       - name: Stop Docker Compose stack
         if: always()
         run: docker compose down -v
+
+  e2e:
+    name: Playwright E2E Tests (Docker Compose Full Stack)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium with system dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Docker images
+        run: docker compose build
+
+      - name: Start full stack with Docker Compose
+        run: |
+          if ! docker compose up -d; then
+            echo "docker compose up -d failed. Showing logs of all containers:"
+            docker compose logs
+            exit 1
+          fi
+
+      - name: Wait for API and Web services to report healthy
+        run: |
+          echo "Waiting for API and Web services to be healthy..."
+          for i in {1..30}; do
+            API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/health || true)
+            WEB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ || true)
+            echo "Attempt $i: API = $API_STATUS, Web = $WEB_STATUS"
+            if [ "$API_STATUS" = "200" ] && [ "$WEB_STATUS" = "200" ]; then
+              echo "Both API and Web are healthy and ready for E2E tests!"
+              break
+            fi
+            sleep 2
+          done
+          if [ "$API_STATUS" != "200" ] || [ "$WEB_STATUS" != "200" ]; then
+            echo "Healthchecks failed! Dumping logs:"
+            docker compose logs
+            exit 1
+          fi
+
+      - name: Run Playwright E2E Tests
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:8080
+          CI: 'true'
+        run: npx playwright test -c apps/web/playwright.config.ts
+
+      - name: Upload Playwright Trace and Artifacts on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-e2e-artifacts
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 7
+
+      - name: Stop Docker Compose stack
+        if: always()
+        run: docker compose down -v
