@@ -7,7 +7,7 @@ WORKDIR /app
 
 RUN apk add --no-cache python3 make g++
 
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/contracts/package.json ./packages/contracts/
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
@@ -36,7 +36,7 @@ RUN addgroup -S -g 1001 nodejs && adduser -S -u 1001 -G nodejs nodejs
 ENV NODE_ENV=production
 ENV PORT=3001
 
-COPY --from=builder --chown=nodejs:nodejs /app/package.json /app/package-lock.json ./
+COPY --from=builder --chown=nodejs:nodejs /app/package.json /app/package-lock.json /app/tsconfig.base.json ./
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/packages/contracts ./packages/contracts
 COPY --from=builder --chown=nodejs:nodejs /app/apps/api/package.json ./apps/api/package.json
