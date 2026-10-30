@@ -17,7 +17,6 @@ describe('Idempotency Key Protocol & Replay Engine', () => {
 
   let sellerToken: string;
   let buyerToken: string;
-  let buyerId: string;
   let auctionId: string;
 
   beforeAll(async () => {
@@ -75,7 +74,6 @@ describe('Idempotency Key Protocol & Replay Engine', () => {
       role: 'BUYER',
     });
     buyerToken = buyer.accessToken;
-    buyerId = buyer.user.id;
 
     // Create active auction with start time in the past and end time in future
     const startTime = new Date(Date.now() - 60000).toISOString();
