@@ -10,7 +10,12 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
 export const BENCHMARK_SELLER_ID = '00000000-0000-0000-0000-000000000001';
-export const BENCHMARK_BIDDER_ID = '00000000-0000-0000-0000-000000000002';
+
+export const BENCHMARK_BIDDER_IDS = Array.from({ length: 20 }, (_, i) => {
+  const num = (i + 1).toString().padStart(12, '0');
+  return `00000000-0000-0000-0002-${num}`;
+});
+export const BENCHMARK_BIDDER_ID = BENCHMARK_BIDDER_IDS[0];
 
 export const BENCHMARK_AUCTION_IDS = Array.from({ length: 20 }, (_, i) => {
   const num = (i + 1).toString().padStart(12, '0');
@@ -47,18 +52,21 @@ export async function seedBenchmarkData(prismaClient = null) {
       },
     });
 
-    // 2. Bidder user
-    await prisma.user.upsert({
-      where: { id: BENCHMARK_BIDDER_ID },
-      update: {},
-      create: {
-        id: BENCHMARK_BIDDER_ID,
-        email: 'benchmark-bidder@example.com',
-        name: 'Benchmark Bidder',
-        passwordHash: 'dummy_argon2_hash',
-        role: 'BUYER',
-      },
-    });
+    // 2. 20 Bidder users
+    for (const bidderId of BENCHMARK_BIDDER_IDS) {
+      const idx = bidderId.slice(-4);
+      await prisma.user.upsert({
+        where: { id: bidderId },
+        update: {},
+        create: {
+          id: bidderId,
+          email: `benchmark-bidder-${idx}@example.com`,
+          name: `Benchmark Bidder ${idx}`,
+          passwordHash: 'dummy_argon2_hash',
+          role: 'BUYER',
+        },
+      });
+    }
 
     // 3. 20 Active Auctions
     const now = new Date();
@@ -93,20 +101,25 @@ export async function seedBenchmarkData(prismaClient = null) {
       process.env['JWT_ACCESS_SECRET'] ||
       'change_this_to_a_secure_random_string_at_least_32_characters_long';
 
-    const tokenPayload = {
-      sub: BENCHMARK_BIDDER_ID,
-      email: 'benchmark-bidder@example.com',
-      role: 'BUYER',
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 86400, // 24 hours
-    };
+    const tokens = BENCHMARK_BIDDER_IDS.map((bidderId) =>
+      generateJwt(
+        {
+          sub: bidderId,
+          email: `benchmark-bidder-${bidderId.slice(-4)}@example.com`,
+          role: 'BUYER',
+          iat: Math.floor(Date.now() / 1000),
+          exp: Math.floor(Date.now() / 1000) + 86400, // 24 hours
+        },
+        secret,
+      ),
+    );
 
-    const token = generateJwt(tokenPayload, secret);
+    const token = tokens[0];
     const tokenPath = path.join(rootDir, 'scripts', '.benchmark-token');
     fs.writeFileSync(tokenPath, token, 'utf-8');
 
-    console.log(`Seeded 20 auctions and bidder token saved to ${tokenPath}`);
-    return { token, auctionIds: BENCHMARK_AUCTION_IDS };
+    console.log(`Seeded 20 auctions and bidder tokens saved to ${tokenPath}`);
+    return { token, tokens, auctionIds: BENCHMARK_AUCTION_IDS };
   } finally {
     if (shouldDisconnect) {
       await prisma.$disconnect();

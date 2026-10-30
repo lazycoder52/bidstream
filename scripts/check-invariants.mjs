@@ -107,9 +107,9 @@ export async function checkInvariants(prismaClient = null) {
 
     // Invariant 6: Zero orphan bids referencing non-existent auctions
     const orphanBids = await prisma.$queryRaw`
-      SELECT b.id, b."auctionId"
+      SELECT b.id, b.auction_id
       FROM bids b
-      LEFT JOIN auctions a ON b."auctionId" = a.id
+      LEFT JOIN auctions a ON b.auction_id = a.id
       WHERE a.id IS NULL
     `;
 

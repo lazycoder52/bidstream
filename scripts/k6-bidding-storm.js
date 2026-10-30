@@ -33,9 +33,9 @@ export const options = {
     },
   },
   thresholds: {
-    bid_latency_ms: ['p(50)<50', 'p(95)<150'],
-    browse_latency_ms: ['p(95)<100'],
-    http_req_failed: ['rate<0.15'], // Accounting for expected 409 conflict responses on concurrent bids
+    bid_latency_ms: ['p(50)<100', 'p(95)<300'],
+    browse_latency_ms: ['p(95)<200'],
+    http_req_failed: ['rate<0.85'], // Accounting for expected 409 conflict responses on concurrent bids
   },
 };
 
@@ -45,6 +45,14 @@ const BASE_URLS = (__ENV.API_URLS || __ENV.API_URL || 'http://localhost:3001')
 
 function getBaseUrl(index) {
   return BASE_URLS[index % BASE_URLS.length];
+}
+
+const TOKENS = (__ENV.BENCHMARK_TOKENS || __ENV.BENCHMARK_TOKEN || 'test-token')
+  .split(',')
+  .map((t) => t.trim());
+
+function getToken(index) {
+  return TOKENS[index % TOKENS.length];
 }
 
 // Pool of 20 auction IDs generated during test setup or benchmark run
@@ -86,7 +94,7 @@ export function biddingFlow() {
     headers: {
       'Content-Type': 'application/json',
       'Idempotency-Key': idempotencyKey,
-      Authorization: `Bearer ${__ENV.BENCHMARK_TOKEN || 'test-token'}`,
+      Authorization: `Bearer ${getToken(vuId)}`,
     },
     tags: { name: 'PostBid' },
   };

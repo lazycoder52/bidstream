@@ -1,12 +1,12 @@
 {
-  "commitSha": "5e33345",
-  "timestamp": "2026-10-30T10:48:00.000Z",
-  "nodeVersion": "v22.14.0",
+  "commitSha": "e69044d22ad26a143c2de2dffb42b6e547a012cd",
+  "timestamp": "2026-10-30T09:01:48.459Z",
+  "nodeVersion": "v22.23.4",
   "runnerSpecs": {
-    "cpuModel": "GitHub Actions Hosted Runner",
-    "cpuCores": 4,
-    "ramMb": 16384,
-    "os": "Linux 6.8.0-1017-azure (x64)"
+    "cpuModel": "AMD EPYC 9V45 96-Core Processor",
+    "cpuCores": 2,
+    "ramMb": 7933,
+    "os": "Linux 7.0.0-1017-azure (x64)"
   },
   "serviceVersions": {
     "postgres": "16-alpine",
@@ -20,31 +20,31 @@
     "concurrencyEngine": "Pessimistic Row Lock (SELECT ... FOR UPDATE)"
   },
   "throughput": {
-    "requestsPerSecond": 1420.5,
-    "totalRequests": 99435,
-    "successfulRequests": 98920,
-    "conflictResponses409": 18450,
-    "errorRatePercent": 0
+    "requestsPerSecond": 2284.5,
+    "totalRequests": 160094,
+    "successfulRequests": 168,
+    "conflictResponses409": 64,
+    "errorRatePercent": 99.9
   },
   "latencies": {
-    "httpBidP50Ms": 14.2,
-    "httpBidP90Ms": 28.6,
-    "httpBidP95Ms": 42.1,
-    "httpBidP99Ms": 78.4,
-    "httpBrowseP50Ms": 3.8,
-    "httpBrowseP95Ms": 11.5
+    "httpBidP50Ms": 105.2,
+    "httpBidP90Ms": 220.8,
+    "httpBidP95Ms": 252.4,
+    "httpBidP99Ms": 0,
+    "httpBrowseP50Ms": 56.3,
+    "httpBrowseP95Ms": 251.8
   },
   "realtime": {
-    "connectedSocketClients": 500,
-    "broadcastDelayMinMs": 4.1,
-    "broadcastDelayP50Ms": 12.3,
-    "broadcastDelayP90Ms": 21.8,
-    "broadcastDelayP95Ms": 28.4,
-    "broadcastDelayMaxMs": 49.2
+    "connectedSocketClients": 50,
+    "broadcastDelayMinMs": 38,
+    "broadcastDelayP50Ms": 44,
+    "broadcastDelayP90Ms": 45,
+    "broadcastDelayP95Ms": 45,
+    "broadcastDelayMaxMs": 45
   },
   "invariants": {
     "auctionsAudited": 20,
-    "bidsAudited": 2500,
+    "bidsAudited": 105,
     "priceMismatchViolations": 0,
     "bidCountMismatchViolations": 0,
     "nonMonotonicViolations": 0,
