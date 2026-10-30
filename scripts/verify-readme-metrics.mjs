@@ -27,6 +27,17 @@ export function verifyReadmeMetrics() {
 
   const errors = [];
 
+  // Check provenance label
+  if (
+    !readme.includes(
+      'GitHub Actions runner, load generator and server share the machine',
+    )
+  ) {
+    errors.push(
+      'README missing required provenance label: "GitHub Actions runner, load generator and server share the machine"',
+    );
+  }
+
   // Check throughput
   const throughputStr = `${loadtest.throughput.requestsPerSecond}`;
   if (!readme.includes(throughputStr)) {

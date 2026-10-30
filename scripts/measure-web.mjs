@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
+import { getProvenanceMetadata } from './provenance.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,7 +16,9 @@ if (!fs.existsSync(metricsDir)) {
 }
 
 if (!fs.existsSync(distAssetsDir)) {
-  console.error(`Dist assets directory not found at ${distAssetsDir}. Run npm run build -w apps/web first.`);
+  console.error(
+    `Dist assets directory not found at ${distAssetsDir}. Run npm run build -w apps/web first.`,
+  );
   process.exit(1);
 }
 
@@ -56,8 +59,10 @@ for (const file of files) {
   }
 }
 
+const provenance = getProvenanceMetadata();
+
 const report = {
-  timestamp: new Date().toISOString(),
+  ...provenance,
   bundle: {
     totalJsBytes,
     totalJsGzipBytes,

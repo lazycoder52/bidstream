@@ -1,0 +1,123 @@
+name: Benchmarks & Metrics Provenance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bidstream
+          POSTGRES_PASSWORD: bidstream_pass
+          POSTGRES_DB: bidstream_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://bidstream:bidstream_pass@localhost:5432/bidstream_db?schema=public
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      REDIS_IN_MEMORY: 'false'
+      THROTTLE_FAIL_OPEN: 'true'
+      JWT_ACCESS_SECRET: change_this_to_a_secure_random_string_at_least_32_characters_long
+      JWT_REFRESH_SECRET: change_this_to_another_secure_random_string_at_least_32_chars
+      CORS_ORIGIN: http://localhost:5173
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install k6 binary
+        run: |
+          curl -sL https://github.com/grafana/k6/releases/download/v0.56.0/k6-v0.56.0-linux-amd64.tar.gz | tar -xz
+          sudo mv k6-v0.56.0-linux-amd64/k6 /usr/local/bin/k6
+          k6 version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build contracts package
+        run: npm run build:contracts
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Deploy Prisma migrations
+        run: npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma
+
+      - name: Build API application
+        run: npm --workspace=@bidstream/api run build
+
+      - name: Build Web application
+        run: npm --workspace=@bidstream/web run build
+
+      - name: Measure Web bundle metrics with provenance
+        run: node scripts/measure-web.mjs
+
+      - name: Start Dual API Instances (Clustered with Redis)
+        run: |
+          PORT=3001 node apps/api/dist/main.js &
+          PORT=3002 node apps/api/dist/main.js &
+          
+          # Wait for API 1 to become healthy
+          for i in {1..30}; do
+            if curl -s http://localhost:3001/health | grep -q '"status":"ok"'; then
+              echo "API Instance 1 is healthy on port 3001"
+              break
+            fi
+            sleep 1
+          done
+
+          # Wait for API 2 to become healthy
+          for i in {1..30}; do
+            if curl -s http://localhost:3002/health | grep -q '"status":"ok"'; then
+              echo "API Instance 2 is healthy on port 3002"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run k6 Bidding Storm, Socket Latency, and Invariants across Dual Instances
+        env:
+          SUBSCRIBER_URL: http://localhost:3001
+          PUBLISHER_URL: http://localhost:3002
+          API_URLS: http://localhost:3001,http://localhost:3002
+        run: |
+          node scripts/run-benchmarks.mjs
+
+      - name: Verify README metrics consistency
+        run: node scripts/verify-readme-metrics.mjs
+
+      - name: Upload Metrics Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics-provenance
+          path: metrics/*.json
