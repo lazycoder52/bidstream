@@ -90,7 +90,8 @@ export async function checkInvariants(prismaClient = null) {
       // Invariant 5: Winner validation on ended auctions
       if (auction.status === 'ENDED' && bids.length > 0) {
         const highestBid = bids[bids.length - 1];
-        const reserveMet = auction.reservePrice === null || highestBid.amount >= auction.reservePrice;
+        const reserveMet =
+          auction.reservePrice === null || highestBid.amount >= auction.reservePrice;
         const expectedWinner = reserveMet ? highestBid.bidderId : null;
 
         if (auction.winnerId !== expectedWinner) {
@@ -155,6 +156,10 @@ if (process.argv[1]?.endsWith('check-invariants.mjs')) {
       }
     })
     .catch((err) => {
+      if (process.env['CI'] === 'true') {
+        console.error('CRITICAL: Invariant check failed to connect or execute in CI:', err.message);
+        process.exit(1);
+      }
       console.warn('Could not run invariant check (database not reachable):', err.message);
     });
 }

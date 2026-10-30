@@ -9,35 +9,64 @@ const bidLatency = new Trend('bid_latency_ms');
 const browseLatency = new Trend('browse_latency_ms');
 const successRate = new Rate('success_rate');
 
-export const options = {
-  scenarios: {
-    // Scenario 1: High-concurrency Bidding Storm across 20 auctions
-    bidding_storm: {
-      executor: 'ramping-vus',
-      startVUs: 20,
-      stages: [
-        { duration: '10s', target: 100 },
-        { duration: '20s', target: 500 },
-        { duration: '30s', target: 500 },
-        { duration: '10s', target: 0 },
-      ],
-      gracefulRampDown: '5s',
-      exec: 'biddingFlow',
-    },
-    // Scenario 2: Browse-Heavy traffic mix
-    browse_traffic: {
-      executor: 'constant-vus',
-      vus: 50,
-      duration: '70s',
-      exec: 'browseFlow',
-    },
-  },
-  thresholds: {
-    bid_latency_ms: ['p(50)<100', 'p(95)<300'],
-    browse_latency_ms: ['p(95)<200'],
-    http_req_failed: ['rate<0.85'], // Accounting for expected 409 conflict responses on concurrent bids
-  },
-};
+const isSmoke = __ENV.SMOKE_TEST === 'true' || __ENV.CI_SMOKE === 'true';
+
+export const options = isSmoke
+  ? {
+      scenarios: {
+        bidding_storm: {
+          executor: 'ramping-vus',
+          startVUs: 5,
+          stages: [
+            { duration: '5s', target: 20 },
+            { duration: '20s', target: 20 },
+            { duration: '5s', target: 0 },
+          ],
+          gracefulRampDown: '2s',
+          exec: 'biddingFlow',
+        },
+        browse_traffic: {
+          executor: 'constant-vus',
+          vus: 10,
+          duration: '30s',
+          exec: 'browseFlow',
+        },
+      },
+      thresholds: {
+        bid_latency_ms: ['p(95)<1000'],
+        browse_latency_ms: ['p(95)<500'],
+        http_req_failed: ['rate<0.95'],
+      },
+    }
+  : {
+      scenarios: {
+        // Scenario 1: High-concurrency Bidding Storm across 20 auctions
+        bidding_storm: {
+          executor: 'ramping-vus',
+          startVUs: 20,
+          stages: [
+            { duration: '10s', target: 100 },
+            { duration: '20s', target: 500 },
+            { duration: '30s', target: 500 },
+            { duration: '10s', target: 0 },
+          ],
+          gracefulRampDown: '5s',
+          exec: 'biddingFlow',
+        },
+        // Scenario 2: Browse-Heavy traffic mix
+        browse_traffic: {
+          executor: 'constant-vus',
+          vus: 50,
+          duration: '70s',
+          exec: 'browseFlow',
+        },
+      },
+      thresholds: {
+        bid_latency_ms: ['p(50)<100', 'p(95)<300'],
+        browse_latency_ms: ['p(95)<200'],
+        http_req_failed: ['rate<0.85'], // Accounting for expected 409 conflict responses on concurrent bids
+      },
+    };
 
 const BASE_URLS = (__ENV.API_URLS || __ENV.API_URL || 'http://localhost:3001')
   .split(',')

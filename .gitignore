@@ -54,3 +54,4 @@ temp/
 
 metrics/lighthouse.json
 metrics/k6-summary.json
+scripts/.benchmark-token*

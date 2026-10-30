@@ -117,6 +117,8 @@ export async function seedBenchmarkData(prismaClient = null) {
     const token = tokens[0];
     const tokenPath = path.join(rootDir, 'scripts', '.benchmark-token');
     fs.writeFileSync(tokenPath, token, 'utf-8');
+    const tokensPath = path.join(rootDir, 'scripts', '.benchmark-tokens');
+    fs.writeFileSync(tokensPath, tokens.join(','), 'utf-8');
 
     console.log(`Seeded 20 auctions and bidder tokens saved to ${tokenPath}`);
     return { token, tokens, auctionIds: BENCHMARK_AUCTION_IDS };
