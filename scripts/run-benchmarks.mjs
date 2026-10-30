@@ -56,6 +56,9 @@ async function runBenchmarkSuite() {
     });
     console.log(`Measured p95 broadcast delay: ${socketMetrics.broadcastDelayP95Ms} ms`);
   } catch (err) {
+    if (process.env['CI'] === 'true') {
+      throw new Error(`Socket latency measurement failed in CI: ${err.message}`);
+    }
     console.warn('Socket latency measurement fallback (using baseline):', err.message);
     socketMetrics = {
       connectedSocketClients: 500,
@@ -98,42 +101,43 @@ async function runBenchmarkSuite() {
         `k6 run --summary-export="${summaryExportPath}" -e API_URLS="${apiUrls}" -e BENCHMARK_TOKEN="${token}" "${k6ScriptPath}"`,
         { stdio: 'inherit', cwd: rootDir },
       );
-
-      if (fs.existsSync(summaryExportPath)) {
-        const k6Summary = JSON.parse(fs.readFileSync(summaryExportPath, 'utf-8'));
-        const m = k6Summary.metrics;
-
-        const totalReqs = m['http_reqs']?.values?.count || 99435;
-        const reqRate = m['http_reqs']?.values?.rate || 1420.5;
-        const conflicts = m['bids_conflict_409']?.values?.count || 18450;
-        const accepted = m['bids_accepted']?.values?.count || 80470;
-        const bidDur = m['bid_latency_ms']?.values;
-        const browseDur = m['browse_latency_ms']?.values;
-
-        throughputMetrics = {
-          requestsPerSecond: Number(reqRate.toFixed(1)),
-          totalRequests: totalReqs,
-          successfulRequests: accepted + conflicts,
-          conflictResponses409: conflicts,
-          errorRatePercent: Number(
-            (((totalReqs - (accepted + conflicts)) / totalReqs) * 100).toFixed(2),
-          ),
-        };
-
-        if (bidDur) {
-          latencyMetrics.httpBidP50Ms = Number((bidDur['p(50)'] || 14.2).toFixed(1));
-          latencyMetrics.httpBidP90Ms = Number((bidDur['p(90)'] || 28.6).toFixed(1));
-          latencyMetrics.httpBidP95Ms = Number((bidDur['p(95)'] || 42.1).toFixed(1));
-          latencyMetrics.httpBidP99Ms = Number((bidDur['p(99)'] || 78.4).toFixed(1));
-        }
-
-        if (browseDur) {
-          latencyMetrics.httpBrowseP50Ms = Number((browseDur['p(50)'] || 3.8).toFixed(1));
-          latencyMetrics.httpBrowseP95Ms = Number((browseDur['p(95)'] || 11.5).toFixed(1));
-        }
-      }
     } catch (k6Err) {
-      console.warn('k6 execution finished or exited with threshold alert:', k6Err.message);
+      console.warn('k6 execution completed with threshold alert or warning:', k6Err.message);
+    }
+
+    if (fs.existsSync(summaryExportPath)) {
+      const k6Summary = JSON.parse(fs.readFileSync(summaryExportPath, 'utf-8'));
+      const m = k6Summary.metrics;
+
+      const totalReqs = m['http_reqs']?.values?.count ?? 0;
+      const reqRate = m['http_reqs']?.values?.rate ?? 0;
+      const conflicts = m['bids_conflict_409']?.values?.count ?? 0;
+      const accepted = m['bids_accepted']?.values?.count ?? 0;
+      const bidDur = m['bid_latency_ms']?.values;
+      const browseDur = m['browse_latency_ms']?.values;
+
+      throughputMetrics = {
+        requestsPerSecond: Number(reqRate.toFixed(1)),
+        totalRequests: totalReqs,
+        successfulRequests: accepted + conflicts,
+        conflictResponses409: conflicts,
+        errorRatePercent:
+          totalReqs > 0
+            ? Number((((totalReqs - (accepted + conflicts)) / totalReqs) * 100).toFixed(2))
+            : 0,
+      };
+
+      if (bidDur) {
+        latencyMetrics.httpBidP50Ms = Number((bidDur['p(50)'] ?? 0).toFixed(1));
+        latencyMetrics.httpBidP90Ms = Number((bidDur['p(90)'] ?? 0).toFixed(1));
+        latencyMetrics.httpBidP95Ms = Number((bidDur['p(95)'] ?? 0).toFixed(1));
+        latencyMetrics.httpBidP99Ms = Number((bidDur['p(99)'] ?? 0).toFixed(1));
+      }
+
+      if (browseDur) {
+        latencyMetrics.httpBrowseP50Ms = Number((browseDur['p(50)'] ?? 0).toFixed(1));
+        latencyMetrics.httpBrowseP95Ms = Number((browseDur['p(95)'] ?? 0).toFixed(1));
+      }
     }
   } else {
     console.log('\nk6 not detected on PATH. Executing verified baseline concurrency run.');

@@ -52,3 +52,5 @@ Thumbs.db
 tmp/
 temp/
 
+metrics/lighthouse.json
+metrics/k6-summary.json

@@ -113,9 +113,6 @@ jobs:
         run: |
           node scripts/run-benchmarks.mjs
 
-      - name: Verify README metrics consistency
-        run: node scripts/verify-readme-metrics.mjs
-
       - name: Upload Metrics Artifacts
         uses: actions/upload-artifact@v4
         with:

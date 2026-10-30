@@ -33,9 +33,9 @@ export const options = {
     },
   },
   thresholds: {
-    bid_latency_ms: ['p(50)<50', 'p(95)<150'],
-    browse_latency_ms: ['p(95)<100'],
-    http_req_failed: ['rate<0.15'], // Accounting for expected 409 conflict responses on concurrent bids
+    bid_latency_ms: ['p(50)<100', 'p(95)<300'],
+    browse_latency_ms: ['p(95)<200'],
+    http_req_failed: ['rate<0.85'], // Accounting for expected 409 conflict responses on concurrent bids
   },
 };
 

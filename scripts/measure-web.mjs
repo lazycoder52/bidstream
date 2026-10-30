@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import http from 'node:http';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { getProvenanceMetadata } from './provenance.mjs';
 
@@ -59,7 +61,86 @@ for (const file of files) {
   }
 }
 
+async function auditLighthouse(port = 4173) {
+  if (process.env['SKIP_LIGHTHOUSE'] === 'true') {
+    console.log('SKIP_LIGHTHOUSE is set; skipping Lighthouse audit.');
+    return null;
+  }
+
+  const distDir = path.join(rootDir, 'apps', 'web', 'dist');
+  const lhOutputPath = path.join(metricsDir, 'lighthouse.json');
+
+  return new Promise((resolve) => {
+    const server = http.createServer((req, res) => {
+      const urlPath = req.url.split('?')[0];
+      let filePath = path.join(distDir, urlPath === '/' ? 'index.html' : urlPath);
+      if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+        filePath = path.join(distDir, 'index.html');
+      }
+      const ext = path.extname(filePath);
+      const mimeTypes = {
+        '.html': 'text/html',
+        '.js': 'application/javascript',
+        '.css': 'text/css',
+        '.json': 'application/json',
+        '.svg': 'image/svg+xml',
+        '.ico': 'image/x-icon',
+      };
+      res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
+      fs.createReadStream(filePath).pipe(res);
+    });
+
+    server.listen(port, () => {
+      console.log(`Preview server listening on port ${port} for Lighthouse audit...`);
+      const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+      const args = [
+        '--yes',
+        'lighthouse',
+        `http://localhost:${port}`,
+        '--chrome-flags="--headless --no-sandbox --disable-dev-shm-usage"',
+        '--output=json',
+        '--output-path=metrics/lighthouse.json',
+        '--only-categories=performance,accessibility,best-practices,seo',
+      ];
+
+      const child = spawn(npxCmd, args, { stdio: 'inherit', shell: true });
+
+      child.on('close', (code) => {
+        let scores = null;
+        if (code === 0 && fs.existsSync(lhOutputPath)) {
+          try {
+            const raw = JSON.parse(fs.readFileSync(lhOutputPath, 'utf-8'));
+            scores = {
+              performance: Math.round((raw.categories?.performance?.score ?? 0) * 100),
+              accessibility: Math.round((raw.categories?.accessibility?.score ?? 0) * 100),
+              bestPractices: Math.round((raw.categories?.['best-practices']?.score ?? 0) * 100),
+              seo: Math.round((raw.categories?.seo?.score ?? 0) * 100),
+            };
+            console.log('Lighthouse audit completed successfully:', scores);
+          } catch (e) {
+            console.warn('Could not parse Lighthouse JSON report:', e.message);
+          }
+        } else {
+          console.warn(`Lighthouse exited with code ${code}`);
+        }
+        server.close(() => resolve(scores));
+      });
+
+      child.on('error', (err) => {
+        console.warn('Failed to start Lighthouse process:', err.message);
+        server.close(() => resolve(null));
+      });
+    });
+
+    server.on('error', (err) => {
+      console.warn(`Preview server error on port ${port}:`, err.message);
+      resolve(null);
+    });
+  });
+}
+
 const provenance = getProvenanceMetadata();
+const lighthouseScores = await auditLighthouse(4173);
 
 const report = {
   ...provenance,
@@ -82,12 +163,7 @@ const report = {
       ]),
     ),
   },
-  lighthouse: {
-    performance: 98,
-    accessibility: 100,
-    bestPractices: 100,
-    seo: 100,
-  },
+  ...(lighthouseScores ? { lighthouse: lighthouseScores } : {}),
 };
 
 const outputPath = path.join(metricsDir, 'web.json');
