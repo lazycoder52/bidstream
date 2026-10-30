@@ -7,6 +7,7 @@ import { useSocketStore } from '@/stores/socket.store';
 import { AlertCircle, WifiOff, X } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const Layout: React.FC = () => {
   const { checkAuth, accessToken } = useAuthStore();
@@ -69,7 +70,9 @@ export const Layout: React.FC = () => {
       <Navbar />
 
       <main className="flex-1 container mx-auto px-4 sm:px-6 py-6 md:py-8">
-        <Outlet />
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
 
       <Footer />

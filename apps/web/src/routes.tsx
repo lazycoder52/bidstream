@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
+import { RouteErrorBoundary } from './components/ErrorBoundary';
 
 const AuctionsListPage = lazy(() =>
   import('./pages/AuctionsListPage').then((m) => ({
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <Layout />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         index: true,
