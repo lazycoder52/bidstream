@@ -92,7 +92,9 @@ test.describe('Real-Time Auction & Bidding E2E Workflows', () => {
     // 6. Live update in second context:
     // Seller's open page must receive the live WebSocket broadcast and update to $120 without reloading
     await expect(sellerPage.getByText(/\$120(\.00)?/).first()).toBeVisible({ timeout: 10000 });
-    await expect(sellerPage.getByText('Buyer Bob', { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(sellerPage.getByText('Buyer Bob', { exact: true })).toBeVisible({
+      timeout: 10000,
+    });
 
     await sellerContext.close();
     await buyerContext.close();
