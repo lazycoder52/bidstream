@@ -43,7 +43,7 @@ describe('Real-Time Multi-Instance Synchronization (Redis Adapter)', () => {
       isRedisAvailable = true;
     } catch (err) {
       testRedis.disconnect();
-      if (process.env['CI'] === 'true') {
+      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
         throw new Error(
           `Redis is required in CI for multi-instance realtime test, but connection failed: ${err instanceof Error ? err.message : String(err)}`,
         );
@@ -147,7 +147,7 @@ describe('Real-Time Multi-Instance Synchronization (Redis Adapter)', () => {
 
   it('propagates room broadcasts across isolated API server nodes via Redis Pub/Sub', async () => {
     if (!isRedisAvailable || !clientOnServer1 || !clientOnServer2 || !ioServer2) {
-      if (process.env['CI'] === 'true') {
+      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
         throw new Error('Redis is required in CI for multi-instance realtime test');
       }
       expect(true).toBe(true);
