@@ -28,7 +28,7 @@ COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1
+HEALTHCHECK --interval=5s --timeout=5s --retries=5 \
+  CMD wget --spider -q http://localhost:8080/ || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

@@ -28,13 +28,15 @@ FROM node:22-alpine AS runner
 
 WORKDIR /app
 
-RUN apk add --no-cache openssl
+# Install native dependencies required for argon2 and prisma
+RUN apk add --no-cache libstdc++ openssl
 
-# Explicit non-root user nodejs:nodejs (UID 1001)
-RUN addgroup -S -g 1001 nodejs && adduser -S -u 1001 -G nodejs nodejs
+# Explicit non-root user nodejs:nodejs (UID 1001) with home directory
+RUN addgroup -S -g 1001 nodejs && adduser -S -u 1001 -G nodejs -h /home/nodejs -D nodejs
 
 ENV NODE_ENV=production
 ENV PORT=3001
+ENV PATH="/app/node_modules/.bin:${PATH}"
 
 COPY --from=builder --chown=nodejs:nodejs /app/package.json /app/package-lock.json /app/tsconfig.base.json ./
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
@@ -43,11 +45,13 @@ COPY --from=builder --chown=nodejs:nodejs /app/apps/api/package.json ./apps/api/
 COPY --from=builder --chown=nodejs:nodejs /app/apps/api/dist ./apps/api/dist
 COPY --from=builder --chown=nodejs:nodejs /app/apps/api/prisma ./apps/api/prisma
 
+RUN chown -R nodejs:nodejs /app
+
 USER nodejs
 
 EXPOSE 3001
 
-HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=5s \
-  CMD node -e "fetch('http://localhost:3001/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
+HEALTHCHECK --interval=5s --timeout=5s --retries=12 --start-period=5s \
+  CMD wget --spider -q http://localhost:3001/health || exit 1
 
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma && node apps/api/dist/main.js"]
+CMD ["sh", "-c", "node ./node_modules/prisma/build/index.js migrate deploy --schema=apps/api/prisma/schema.prisma && node apps/api/dist/main.js"]

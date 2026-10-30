@@ -107,7 +107,12 @@ jobs:
         run: docker compose build
 
       - name: Start full stack with Docker Compose
-        run: docker compose up -d
+        run: |
+          if ! docker compose up -d; then
+            echo "docker compose up -d failed. Showing logs of all containers:"
+            docker compose logs
+            exit 1
+          fi
 
       - name: Verify API and downstream health
         run: |
