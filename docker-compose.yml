@@ -8,11 +8,11 @@ services:
       POSTGRES_PASSWORD: bidstream_pass
       POSTGRES_DB: bidstream_db
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bidstream -d bidstream_db"]
+      test: ['CMD-SHELL', 'pg_isready -U bidstream -d bidstream_db']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,11 +22,11 @@ services:
     container_name: bidstream-redis
     restart: always
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -43,20 +43,21 @@ services:
       DATABASE_URL: postgresql://bidstream:bidstream_pass@postgres:5432/bidstream_db?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_IN_MEMORY: "false"
-      THROTTLE_FAIL_OPEN: "false"
+      REDIS_IN_MEMORY: 'false'
+      THROTTLE_FAIL_OPEN: 'false'
+      THROTTLE_LIMIT: 50000
       JWT_ACCESS_SECRET: production_access_token_secret_must_be_32_characters
       JWT_REFRESH_SECRET: production_refresh_token_secret_must_be_32_chars
       CORS_ORIGIN: http://localhost:8080,http://localhost:80,http://localhost:5173
     ports:
-      - "3001:3001"
+      - '3001:3001'
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget --spider -q http://localhost:3001/health || exit 1"]
+      test: ['CMD-SHELL', 'wget --spider -q http://localhost:3001/health || exit 1']
       interval: 5s
       timeout: 5s
       retries: 12
@@ -69,12 +70,12 @@ services:
     container_name: bidstream-web
     restart: always
     ports:
-      - "8080:8080"
+      - '8080:8080'
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget --spider -q http://localhost:8080/ || exit 1"]
+      test: ['CMD-SHELL', 'wget --spider -q http://localhost:8080/ || exit 1']
       interval: 5s
       timeout: 5s
       retries: 5

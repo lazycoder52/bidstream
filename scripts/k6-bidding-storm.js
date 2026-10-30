@@ -9,6 +9,9 @@ const bidLatency = new Trend('bid_latency_ms');
 const browseLatency = new Trend('browse_latency_ms');
 const successRate = new Rate('success_rate');
 
+// Register expected statuses: 200 (OK), 201 (Created), and 409 (Outbid Conflict under contention)
+http.setResponseCallback(http.expectedStatuses(200, 201, 409));
+
 const isSmoke = __ENV.SMOKE_TEST === 'true' || __ENV.CI_SMOKE === 'true';
 
 export const options = isSmoke
@@ -35,7 +38,7 @@ export const options = isSmoke
       thresholds: {
         bid_latency_ms: ['p(95)<1000'],
         browse_latency_ms: ['p(95)<500'],
-        http_req_failed: ['rate<0.95'],
+        http_req_failed: ['rate<0.10'],
       },
     }
   : {
