@@ -95,6 +95,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Build API application
+        run: npm --workspace=@bidstream/api run build
+
       - name: Run unit & integration tests
         run: npm run test
 
