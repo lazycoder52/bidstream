@@ -65,8 +65,13 @@ jobs:
       - name: Generate Prisma client
         run: npm run prisma:generate
 
-      - name: Push Prisma schema to test database
-        run: npx prisma db push --schema=apps/api/prisma/schema.prisma --skip-generate
+      - name: Deploy Prisma migrations
+        run: npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma
+
+      - name: Verify migrations status & schema sync
+        run: |
+          npx prisma migrate status --schema=apps/api/prisma/schema.prisma
+          npx prisma migrate diff --from-schema-datasource apps/api/prisma/schema.prisma --to-schema-datamodel apps/api/prisma/schema.prisma --exit-code
 
       - name: Lint check
         run: npm run lint
