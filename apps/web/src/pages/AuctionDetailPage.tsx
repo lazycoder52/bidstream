@@ -472,22 +472,36 @@ export const AuctionDetailPage: React.FC = () => {
                       position: 'relative',
                     }}
                   >
-                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                      const bid = activeBids[virtualRow.index];
+                    {(rowVirtualizer.getVirtualItems().length > 0
+                      ? rowVirtualizer.getVirtualItems().map((virtualRow) => ({
+                          bid: activeBids[virtualRow.index],
+                          virtualRow,
+                          index: virtualRow.index,
+                        }))
+                      : activeBids.map((bid, index) => ({
+                          bid,
+                          virtualRow: null,
+                          index,
+                        }))
+                    ).map(({ bid, virtualRow, index }) => {
                       if (!bid) return null;
-                      const isTopBid = virtualRow.index === 0;
+                      const isTopBid = index === 0;
 
                       return (
                         <div
                           key={bid.id}
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            height: `${virtualRow.size}px`,
-                            transform: `translateY(${virtualRow.start}px)`,
-                          }}
+                          style={
+                            virtualRow
+                              ? {
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  width: '100%',
+                                  height: `${virtualRow.size}px`,
+                                  transform: `translateY(${virtualRow.start}px)`,
+                                }
+                              : undefined
+                          }
                           className={`flex items-center justify-between py-2 text-xs transition-colors ${
                             isTopBid ? 'bg-indigo-500/10 font-bold px-2 rounded-md' : ''
                           }`}

@@ -194,8 +194,10 @@ test.describe('Real-Time Auction & Bidding E2E Workflows', () => {
           status: 409,
           contentType: 'application/json',
           body: JSON.stringify({
+            success: false,
             statusCode: 409,
             message: 'Outbid: A higher bid has already been accepted.',
+            timestamp: new Date().toISOString(),
           }),
         });
       } else {
