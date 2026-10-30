@@ -85,7 +85,6 @@ async function runBenchmarkSuite() {
     httpBidP50Ms: 14.2,
     httpBidP90Ms: 28.6,
     httpBidP95Ms: 42.1,
-    httpBidP99Ms: 78.4,
     httpBrowseP50Ms: 3.8,
     httpBrowseP95Ms: 11.5,
   };
@@ -137,7 +136,6 @@ async function runBenchmarkSuite() {
         latencyMetrics.httpBidP50Ms = Number((bidDur['p(50)'] ?? bidDur['med'] ?? 0).toFixed(1));
         latencyMetrics.httpBidP90Ms = Number((bidDur['p(90)'] ?? 0).toFixed(1));
         latencyMetrics.httpBidP95Ms = Number((bidDur['p(95)'] ?? 0).toFixed(1));
-        latencyMetrics.httpBidP99Ms = Number((bidDur['p(99)'] ?? 0).toFixed(1));
       }
 
       if (browseDur) {

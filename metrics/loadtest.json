@@ -32,7 +32,6 @@
     "httpBidP50Ms": 920.9,
     "httpBidP90Ms": 1088.2,
     "httpBidP95Ms": 1138.5,
-    "httpBidP99Ms": 0,
     "httpBrowseP50Ms": 209.3,
     "httpBrowseP95Ms": 439.8
   },
