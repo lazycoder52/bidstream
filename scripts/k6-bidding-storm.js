@@ -39,7 +39,13 @@ export const options = {
   },
 };
 
-const BASE_URL = __ENV.API_URL || 'http://localhost:3000';
+const BASE_URLS = (__ENV.API_URLS || __ENV.API_URL || 'http://localhost:3001')
+  .split(',')
+  .map((u) => u.trim());
+
+function getBaseUrl(index) {
+  return BASE_URLS[index % BASE_URLS.length];
+}
 
 // Pool of 20 auction IDs generated during test setup or benchmark run
 const AUCTION_IDS = [
@@ -69,6 +75,7 @@ export function biddingFlow() {
   const auctionId = AUCTION_IDS[Math.floor(Math.random() * AUCTION_IDS.length)];
   const vuId = __VU;
   const iterId = __ITER;
+  const baseUrl = getBaseUrl(vuId);
   const idempotencyKey = `idemp-${vuId}-${iterId}-${Date.now()}`;
 
   // Bid placement
@@ -84,7 +91,7 @@ export function biddingFlow() {
     tags: { name: 'PostBid' },
   };
 
-  const res = http.post(`${BASE_URL}/auctions/${auctionId}/bids`, payload, params);
+  const res = http.post(`${baseUrl}/auctions/${auctionId}/bids`, payload, params);
 
   bidLatency.add(res.timings.duration);
 
@@ -105,10 +112,11 @@ export function biddingFlow() {
 export function browseFlow() {
   const vuId = __VU;
   const iter = __ITER;
+  const baseUrl = getBaseUrl(vuId);
 
   if (iter % 3 === 0) {
     // Browse auction listing
-    const res = http.get(`${BASE_URL}/auctions?page=1&limit=20&status=ACTIVE`, {
+    const res = http.get(`${baseUrl}/auctions?page=1&limit=20&status=ACTIVE`, {
       tags: { name: 'ListAuctions' },
     });
     browseLatency.add(res.timings.duration);
@@ -116,7 +124,7 @@ export function browseFlow() {
   } else {
     // Query specific auction detail
     const auctionId = AUCTION_IDS[vuId % AUCTION_IDS.length];
-    const res = http.get(`${BASE_URL}/auctions/${auctionId}`, {
+    const res = http.get(`${baseUrl}/auctions/${auctionId}`, {
       tags: { name: 'GetAuction' },
     });
     browseLatency.add(res.timings.duration);

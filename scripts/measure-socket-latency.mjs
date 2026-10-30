@@ -1,19 +1,27 @@
 import { io } from 'socket.io-client';
 
 export async function measureSocketLatency({
-  serverUrl = 'http://localhost:3000',
+  serverUrl = 'http://localhost:3001',
+  subscriberUrl = null,
+  bidServerUrl = 'http://localhost:3002',
+  token = null,
   clientCount = 50,
   auctionId = '10000000-0000-0000-0000-000000000001',
   sampleCount = 10,
   postBidFn = null,
 } = {}) {
+  const targetSubscriberUrl = subscriberUrl || serverUrl;
   const sockets = [];
   const connectionPromises = [];
 
-  // 1. Connect clients
+  console.log(
+    `Connecting ${clientCount} socket clients to ${targetSubscriberUrl} (room: auction:${auctionId})...`,
+  );
+
+  // 1. Connect clients to subscriber instance
   for (let i = 0; i < clientCount; i++) {
     const p = new Promise((resolve, reject) => {
-      const socket = io(serverUrl, {
+      const socket = io(targetSubscriberUrl, {
         transports: ['websocket'],
         reconnection: false,
         timeout: 5000,
@@ -39,14 +47,38 @@ export async function measureSocketLatency({
 
   try {
     await Promise.all(connectionPromises);
+    console.log(`All ${clientCount} socket clients connected and joined.`);
   } catch (err) {
-    // If live server is not running, clean up and throw
     for (const s of sockets) s.disconnect();
     throw new Error(`Failed to connect socket clients: ${err.message}`);
   }
 
-  // 2. Measure broadcast latency over multiple samples
+  // 2. Measure cross-instance broadcast latency over multiple samples
   const latencies = [];
+
+  const defaultPostBid = async (targetAuctionId, sampleIndex) => {
+    const url = `${bidServerUrl}/auctions/${targetAuctionId}/bids`;
+    const idempotencyKey = `socket-latency-test-${sampleIndex}-${Date.now()}`;
+    const headers = {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey,
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await globalThis.fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ amount: 1000 + sampleIndex * 10 }),
+    });
+
+    if (!res.ok && res.status !== 409) {
+      console.warn(`Post bid returned status ${res.status}`);
+    }
+  };
+
+  const executePostBid = postBidFn || defaultPostBid;
 
   for (let sample = 0; sample < sampleCount; sample++) {
     const broadcastReceipts = [];
@@ -71,12 +103,14 @@ export async function measureSocketLatency({
         s.once('bid:placed', onBidPlaced);
       }
 
-      // Timeout fallback in case some socket misses packet
+      // Timeout fallback
       setTimeout(() => resolve(), 3000);
     });
 
-    if (postBidFn) {
-      await postBidFn(auctionId, sample);
+    try {
+      await executePostBid(auctionId, sample);
+    } catch (e) {
+      console.warn(`Sample ${sample} post bid error:`, e.message);
     }
 
     await samplePromise;
@@ -93,13 +127,13 @@ export async function measureSocketLatency({
 
   if (latencies.length === 0) {
     return {
-      clientCount,
+      connectedSocketClients: clientCount,
       samples: 0,
-      minMs: 0,
-      p50Ms: 0,
-      p90Ms: 0,
-      p95Ms: 0,
-      maxMs: 0,
+      broadcastDelayMinMs: 0,
+      broadcastDelayP50Ms: 0,
+      broadcastDelayP90Ms: 0,
+      broadcastDelayP95Ms: 0,
+      broadcastDelayMaxMs: 0,
     };
   }
 
@@ -111,13 +145,13 @@ export async function measureSocketLatency({
   const max = latencies[latencies.length - 1];
 
   return {
-    clientCount,
+    connectedSocketClients: clientCount,
     samples: latencies.length,
-    minMs: min,
-    p50Ms: p50,
-    p90Ms: p90,
-    p95Ms: p95,
-    maxMs: max,
+    broadcastDelayMinMs: min,
+    broadcastDelayP50Ms: p50,
+    broadcastDelayP90Ms: p90,
+    broadcastDelayP95Ms: p95,
+    broadcastDelayMaxMs: max,
   };
 }
 
@@ -125,5 +159,7 @@ if (process.argv[1]?.endsWith('measure-socket-latency.mjs')) {
   console.log('Running standalone socket latency measurement...');
   measureSocketLatency()
     .then((result) => console.log('Socket Latency Result:', JSON.stringify(result, null, 2)))
-    .catch((err) => console.warn('Could not run standalone measurement (server not listening):', err.message));
+    .catch((err) =>
+      console.warn('Could not run standalone measurement (server not listening):', err.message),
+    );
 }
