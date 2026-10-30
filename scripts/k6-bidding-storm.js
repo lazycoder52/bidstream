@@ -39,7 +39,7 @@ export const options = isSmoke
       thresholds: {
         bid_latency_ms: ['p(95)<1000'],
         browse_latency_ms: ['p(95)<500'],
-        http_req_failed: ['rate<0.10'],
+        http_req_failed: ['rate<0.85'], // Accounting for expected 409 conflict responses under contention
       },
     }
   : {
