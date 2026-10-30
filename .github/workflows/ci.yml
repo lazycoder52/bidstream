@@ -123,6 +123,8 @@ jobs:
         run: docker compose build
 
       - name: Start full stack with Docker Compose
+        env:
+          THROTTLE_LIMIT: '50000'
         run: |
           if ! docker compose up -d; then
             echo "docker compose up -d failed. Showing logs of all containers:"
@@ -238,6 +240,8 @@ jobs:
         run: docker compose build
 
       - name: Start full stack with Docker Compose
+        env:
+          THROTTLE_LIMIT: '50000'
         run: |
           if ! docker compose up -d; then
             echo "docker compose up -d failed. Showing logs of all containers:"

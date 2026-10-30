@@ -45,7 +45,7 @@ services:
       REDIS_PORT: 6379
       REDIS_IN_MEMORY: 'false'
       THROTTLE_FAIL_OPEN: 'false'
-      THROTTLE_LIMIT: 50000
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
       JWT_ACCESS_SECRET: production_access_token_secret_must_be_32_characters
       JWT_REFRESH_SECRET: production_refresh_token_secret_must_be_32_chars
       CORS_ORIGIN: http://localhost:8080,http://localhost:80,http://localhost:5173

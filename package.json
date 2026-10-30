@@ -27,6 +27,7 @@
     "docker:down": "docker compose down",
     "prisma:generate": "npm run prisma:generate -w apps/api",
     "prisma:migrate": "npm run prisma:migrate -w apps/api",
+    "prisma:migrate:deploy": "npm run prisma:migrate:deploy -w apps/api",
     "prisma:seed": "npm run prisma:seed -w apps/api"
   },
   "devDependencies": {
