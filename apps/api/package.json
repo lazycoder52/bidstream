@@ -9,7 +9,7 @@
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
     "typecheck": "tsc --noEmit",
-    "test": "jest",
+    "test": "jest --verbose",
     "test:unit": "jest --testPathPattern=\".*\\.spec\\.ts$\"",
     "test:concurrency": "jest --testPathPattern=\".*\\.concurrency\\.spec\\.ts$\" --runInBand",
     "prisma:generate": "prisma generate",

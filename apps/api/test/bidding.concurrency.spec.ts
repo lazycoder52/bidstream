@@ -30,7 +30,7 @@ describe('High-Concurrency Bidding Engine (Real PostgreSQL)', () => {
       await prisma.$queryRaw`SELECT 1`;
       isPostgresAvailable = true;
     } catch (err) {
-      if (process.env['CI'] === 'true') {
+      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
         throw new Error(
           `Real PostgreSQL is required in CI for bidding concurrency suite, but database connection failed: ${err instanceof Error ? err.message : String(err)}`,
         );
@@ -125,7 +125,7 @@ describe('High-Concurrency Bidding Engine (Real PostgreSQL)', () => {
 
   it('correctly serializes 200 parallel bids without deadlocks or lost updates', async () => {
     if (!isPostgresAvailable) {
-      if (process.env['CI'] === 'true') {
+      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
         throw new Error(
           'Real PostgreSQL is required in CI for 200-bid concurrency test, but was not available.',
         );

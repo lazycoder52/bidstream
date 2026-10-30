@@ -37,7 +37,7 @@ describe('Idempotency Key Protocol & Replay Engine', () => {
       await testPrisma.$disconnect();
     } catch (err) {
       await testPrisma.$disconnect().catch(() => {});
-      if (process.env['CI'] === 'true') {
+      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
         throw new Error(
           `Real PostgreSQL is required in CI for idempotency test suite, but database connection failed: ${err instanceof Error ? err.message : String(err)}`,
         );
@@ -118,7 +118,7 @@ describe('Idempotency Key Protocol & Replay Engine', () => {
 
   it('replays exact identical response body and status code on duplicate submission', async () => {
     if (!isPostgresAvailable) {
-      if (process.env['CI'] === 'true') {
+      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
         throw new Error('Real PostgreSQL is required in CI for idempotency replay test');
       }
       return;
@@ -157,7 +157,7 @@ describe('Idempotency Key Protocol & Replay Engine', () => {
 
   it('does not replay when a different idempotency key is provided', async () => {
     if (!isPostgresAvailable) {
-      if (process.env['CI'] === 'true') {
+      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
         throw new Error('Real PostgreSQL is required in CI for idempotency test');
       }
       return;
