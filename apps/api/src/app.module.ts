@@ -43,7 +43,7 @@ import { RedisThrottlerStorage } from './common/throttler/redis-throttler.storag
             limit: config.get<number>('THROTTLE_LIMIT', 120),
           },
         ],
-        storage: new RedisThrottlerStorage(redisService),
+        storage: new RedisThrottlerStorage(redisService, config),
       }),
     }),
     PrismaModule,

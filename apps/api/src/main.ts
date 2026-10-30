@@ -29,11 +29,20 @@ async function bootstrap() {
 
   // WebSocket Redis Adapter for multi-instance scaling
   const configService = app.get(ConfigService);
-  const redisIoAdapter = new RedisIoAdapter(app);
-  const redisHost = configService.get<string>('REDIS_HOST', 'localhost');
-  const redisPort = configService.get<number>('REDIS_PORT', 6379);
-  await redisIoAdapter.connectToRedis(redisHost, redisPort);
-  app.useWebSocketAdapter(redisIoAdapter);
+  const isInMemory = configService.get<boolean>('REDIS_IN_MEMORY', false);
+  const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+
+  if (isInMemory && nodeEnv !== 'production') {
+    logger.warn(
+      'REDIS_IN_MEMORY dev flag active: using standalone in-memory Socket.IO adapter (single node only).',
+    );
+  } else {
+    const redisIoAdapter = new RedisIoAdapter(app);
+    const redisHost = configService.get<string>('REDIS_HOST', 'localhost');
+    const redisPort = configService.get<number>('REDIS_PORT', 6379);
+    await redisIoAdapter.connectToRedis(redisHost, redisPort, false);
+    app.useWebSocketAdapter(redisIoAdapter);
+  }
 
   // Swagger OpenAPI Documentation
   const swaggerConfig = new DocumentBuilder()

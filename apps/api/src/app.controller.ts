@@ -21,14 +21,12 @@ export class AppController {
   @ApiResponse({ status: 200, description: 'Service is fully healthy' })
   @ApiResponse({ status: 503, description: 'One or more downstream services are unhealthy' })
   async getHealth(@Res({ passthrough: true }) res: Response) {
-    const [dbResult, redisResult] = await Promise.allSettled([
-      this.prisma.$queryRaw`SELECT 1`,
-      this.redis.getClient().ping(),
+    const [dbResult, isRedisHealthy] = await Promise.all([
+      this.prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false),
+      this.redis.ping(),
     ]);
 
-    const isDbHealthy = dbResult.status === 'fulfilled';
-    const isRedisHealthy = redisResult.status === 'fulfilled';
-    const isAllHealthy = isDbHealthy && isRedisHealthy;
+    const isAllHealthy = dbResult && isRedisHealthy;
 
     if (!isAllHealthy) {
       res.status(HttpStatus.SERVICE_UNAVAILABLE);
@@ -39,7 +37,7 @@ export class AppController {
       timestamp: new Date().toISOString(),
       uptime: Math.floor(process.uptime()),
       services: {
-        database: isDbHealthy ? 'up' : 'down',
+        database: dbResult ? 'up' : 'down',
         redis: isRedisHealthy ? 'up' : 'down',
       },
     };

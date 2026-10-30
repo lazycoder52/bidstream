@@ -8,7 +8,7 @@ import { MetricsService } from './metrics/metrics.service.js';
 describe('AppController', () => {
   let appController: AppController;
   let prismaMock: { $queryRaw: jest.Mock };
-  let redisMock: { getClient: jest.Mock };
+  let redisMock: { ping: jest.Mock; getClient: jest.Mock };
   let metricsMock: { getMetrics: jest.Mock; getContentType: jest.Mock };
 
   beforeEach(async () => {
@@ -17,6 +17,7 @@ describe('AppController', () => {
     };
 
     redisMock = {
+      ping: jest.fn().mockResolvedValue(true),
       getClient: jest.fn().mockReturnValue({
         ping: jest.fn().mockResolvedValue('PONG'),
       }),
