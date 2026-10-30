@@ -75,7 +75,7 @@ Full architectural decision records are documented in [`docs/adr/`](docs/adr/):
 
 ## Verified Results
 
-All numbers in this section are generated directly by automated measurement scripts (`scripts/run-benchmarks.mjs` and `scripts/measure-web.mjs`) and saved to `metrics/*.json`. An automated verification test (`scripts/verify-readme-metrics.mjs`) asserts that these figures match the source metrics files.
+All numbers in this section are generated directly by automated CI measurement runs (GitHub Actions runner, load generator and server share the machine) via `.github/workflows/benchmarks.yml` and saved to `metrics/*.json`. An automated verification test (`scripts/verify-readme-metrics.mjs`) asserts that these figures match the source metrics files without discrepancies.
 
 ### Load and Concurrency Benchmark (metrics/loadtest.json)
 

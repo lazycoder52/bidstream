@@ -1,5 +1,18 @@
 {
-  "timestamp": "2026-10-29T19:10:37.462Z",
+  "commitSha": "5e33345",
+  "timestamp": "2026-10-30T10:48:00.000Z",
+  "nodeVersion": "v22.14.0",
+  "runnerSpecs": {
+    "cpuModel": "GitHub Actions Hosted Runner",
+    "cpuCores": 4,
+    "ramMb": 16384,
+    "os": "Linux 6.8.0-1017-azure (x64)"
+  },
+  "serviceVersions": {
+    "postgres": "16-alpine",
+    "redis": "7-alpine"
+  },
+  "environment": "GitHub Actions runner, load generator and server share the machine",
   "configuration": {
     "virtualUsers": 500,
     "targetAuctions": 20,
