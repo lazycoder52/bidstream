@@ -18,17 +18,36 @@ async function bootstrap() {
   app.use(helmet());
   app.use(cookieParser());
 
-  const corsOrigin = process.env['CORS_ORIGIN'] || 'http://localhost:5173';
+  const configService = app.get(ConfigService);
+  const rawCorsOrigin = configService.get<string>('CORS_ORIGIN', 'http://localhost:5173');
+  const allowedOrigins = rawCorsOrigin
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: corsOrigin.includes(',') ? corsOrigin.split(',') : corsOrigin,
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      // Allow requests with no origin (e.g. mobile apps, curl, or server-to-server)
+      if (!origin) {
+        return callback(null, true);
+      }
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS origin '${origin}' not allowed by BidStream policy`));
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'x-request-id'],
   });
 
   app.useGlobalPipes(new ZodValidationPipe());
   app.useGlobalFilters(new HttpExceptionFilter());
 
   // WebSocket Redis Adapter for multi-instance scaling
-  const configService = app.get(ConfigService);
   const isInMemory = configService.get<boolean>('REDIS_IN_MEMORY', false);
   const nodeEnv = configService.get<string>('NODE_ENV', 'development');
 

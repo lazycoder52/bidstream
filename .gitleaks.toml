@@ -1,0 +1,7 @@
+[allowlist]
+description = "Ignore mock test secrets and example configs"
+paths = [
+  '''\.env\.example''',
+  '''apps/api/test/.*''',
+  '''docker-compose\.yml''',
+]

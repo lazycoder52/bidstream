@@ -188,4 +188,82 @@ describe('Auth Module (Integration)', () => {
     expect(res.body.success).toBe(false);
     expect(res.body.statusCode).toBe(401);
   });
+
+  it('POST /auth/refresh - rejects untrusted origin with 401', async () => {
+    const loginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({
+        email: 'bidder@example.com',
+        password: 'Password123',
+      })
+      .expect(200);
+
+    const cookies = loginRes.headers['set-cookie'] as unknown as string[];
+    expect(cookies).toBeDefined();
+    const cookie = cookies[0]!;
+
+    const res = await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .set('Origin', 'http://malicious-website.com')
+      .set('Cookie', cookie)
+      .send({})
+      .expect(401);
+
+    expect(res.body.success).toBe(false);
+    expect(res.body.message).toContain('not authorized');
+  });
+
+  it('POST /auth/refresh - accepts allowed origin and rotates tokens with SameSite cookie', async () => {
+    const loginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({
+        email: 'bidder@example.com',
+        password: 'Password123',
+      })
+      .expect(200);
+
+    const cookies = loginRes.headers['set-cookie'] as unknown as string[];
+    expect(cookies).toBeDefined();
+    const cookie = cookies[0]!;
+
+    const res = await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .set('Origin', 'http://localhost:5173')
+      .set('Cookie', cookie)
+      .send({})
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.accessToken).toBeDefined();
+    const resCookies = res.headers['set-cookie'] as unknown as string[];
+    expect(resCookies).toBeDefined();
+    expect(resCookies[0]).toContain('SameSite=Strict');
+    expect(resCookies[0]).toContain('HttpOnly');
+  });
+
+  it('POST /auth/logout - revokes session and clears refresh cookie', async () => {
+    const loginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({
+        email: 'bidder@example.com',
+        password: 'Password123',
+      })
+      .expect(200);
+
+    const token = loginRes.body.data.accessToken;
+    const cookies = loginRes.headers['set-cookie'] as unknown as string[];
+    expect(cookies).toBeDefined();
+    const cookie = cookies[0]!;
+
+    const res = await request(app.getHttpServer())
+      .post('/auth/logout')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Cookie', cookie)
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+    const resCookies = res.headers['set-cookie'] as unknown as string[];
+    expect(resCookies).toBeDefined();
+    expect(resCookies[0]).toContain('refresh_token=;');
+  });
 });
