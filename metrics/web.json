@@ -1,6 +1,6 @@
 {
-  "commitSha": "e69044d22ad26a143c2de2dffb42b6e547a012cd",
-  "timestamp": "2026-10-30T09:01:20.404Z",
+  "commitSha": "e477b87909417156715f3c7631a4e4563f294c6e",
+  "timestamp": "2026-10-30T19:43:18.355Z",
   "nodeVersion": "v22.23.4",
   "runnerSpecs": {
     "cpuModel": "AMD EPYC 9V45 96-Core Processor",
@@ -14,30 +14,30 @@
   },
   "environment": "GitHub Actions runner, load generator and server share the machine",
   "bundle": {
-    "totalJsBytes": 633035,
-    "totalJsGzipBytes": 199320,
-    "totalJsKb": 618.2,
-    "totalJsGzipKb": 194.65,
-    "totalCssBytes": 33603,
-    "totalCssGzipBytes": 6698,
-    "totalCssKb": 32.82,
-    "totalCssGzipKb": 6.54,
+    "totalJsBytes": 638425,
+    "totalJsGzipBytes": 200865,
+    "totalJsKb": 623.46,
+    "totalJsGzipKb": 196.16,
+    "totalCssBytes": 33875,
+    "totalCssGzipBytes": 6757,
+    "totalCssKb": 33.08,
+    "totalCssGzipKb": 6.6,
     "chunks": {
       "mainIndex": {
-        "rawKb": 322.37,
-        "gzipKb": 96.23
+        "rawKb": 326.76,
+        "gzipKb": 97.41
       },
       "css": {
-        "rawKb": 32.82,
-        "gzipKb": 6.54
+        "rawKb": 33.08,
+        "gzipKb": 6.6
       },
       "vendorQuery": {
         "rawKb": 71.76,
         "gzipKb": 21.36
       },
       "vendorReact": {
-        "rawKb": 104.06,
-        "gzipKb": 35.01
+        "rawKb": 104.08,
+        "gzipKb": 35.02
       },
       "vendorSocket": {
         "rawKb": 40.72,
@@ -46,7 +46,7 @@
     }
   },
   "lighthouse": {
-    "performance": 73,
+    "performance": 70,
     "accessibility": 95,
     "bestPractices": 96,
     "seo": 82

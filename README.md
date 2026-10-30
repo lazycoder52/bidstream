@@ -81,41 +81,43 @@ All numbers in this section are generated directly by automated CI measurement r
 
 The load benchmark evaluates 500 concurrent virtual users executing a high-concurrency bidding storm across 20 active auctions alongside background browse-heavy traffic.
 
-| Metric                              | Measured Value              | Standard / Target |
-| ----------------------------------- | --------------------------- | ----------------- |
-| **Sustained Throughput**            | 2284.5 req/s                | > 1,000 req/s     |
-| **HTTP Bid Latency (p50)**          | 105.2 ms                    | < 150 ms          |
-| **HTTP Bid Latency (p90)**          | 220.8 ms                    | < 250 ms          |
-| **HTTP Bid Latency (p95)**          | 252.4 ms                    | < 300 ms          |
-| **HTTP Browse Latency (p50)**       | 56.3 ms                     | < 100 ms          |
-| **HTTP Browse Latency (p95)**       | 251.8 ms                    | < 300 ms          |
-| **WebSocket Broadcast Delay (p50)** | 44 ms                       | < 50 ms           |
-| **WebSocket Broadcast Delay (p95)** | 45 ms                       | < 50 ms           |
-| **WebSocket Broadcast Delay (max)** | 45 ms                       | < 100 ms          |
-| **Simultaneous WebSocket Clients**  | 50 clients                  | 50 clients        |
-| **Total Benchmark Requests**        | 160094 requests             | -                 |
-| **Database Invariant Violations**   | 0 violations (passed: true) | Exactly 0         |
+| Metric                                | Measured Value              | Standard / Target |
+| ------------------------------------- | --------------------------- | ----------------- |
+| **Sustained Throughput**              | 559.1 req/s                 | > 500 req/s       |
+| **Total Benchmark Requests**          | 39197 requests              | -                 |
+| **Accepted Bids**                     | 1726 bids                   | -                 |
+| **Rejected Bids (Contention/Outbid)** | 26661 bids                  | -                 |
+| **HTTP Bid Latency (p50)**            | 920.9 ms                    | < 1000 ms         |
+| **HTTP Bid Latency (p90)**            | 1088.2 ms                   | < 1200 ms         |
+| **HTTP Bid Latency (p95)**            | 1138.5 ms                   | < 1200 ms         |
+| **HTTP Browse Latency (p50)**         | 209.3 ms                    | < 300 ms          |
+| **HTTP Browse Latency (p95)**         | 439.8 ms                    | < 500 ms          |
+| **WebSocket Broadcast Delay (p50)**   | 54 ms                       | < 60 ms           |
+| **WebSocket Broadcast Delay (p95)**   | 55 ms                       | < 60 ms           |
+| **WebSocket Broadcast Delay (max)**   | 55 ms                       | < 100 ms          |
+| **Simultaneous WebSocket Clients**    | 50 clients                  | 50 clients        |
+| **Database Invariant Violations**     | 0 violations (passed: true) | Exactly 0         |
 
 ### Web Performance & Bundle Audit (metrics/web.json)
 
 Bundle size measurements were collected via production build analysis of the React 19 single-page application. Route-level code splitting is implemented across all routes (`/auctions`, `/auctions/:id`, `/auctions/create`, `/dashboard`, `/login`, `/register`) using dynamic `React.lazy` imports wrapped with `<Suspense>`, ensuring secondary routes are loaded on demand.
 
-- **Initial-Load JavaScript (gzip)**: **96.23 KB** (`mainIndex` entry chunk transferred over the wire)
-- **Total Initial Transfer (JS + CSS gzip)**: **102.77 KB**
+- **Initial-Load JavaScript (gzip)**: **97.41 KB** (`mainIndex` entry chunk transferred over the wire)
+- **Total Initial Transfer (JS + CSS gzip)**: **104.01 KB**
 - **Route-Level Code Splitting**: Confirmed active across all routes with dynamic chunking.
 
 | Metric                      | Measured Value | Gzip Transferred |
 | --------------------------- | -------------- | ---------------- |
-| **Total JavaScript Bundle** | 618.2 KB       | 194.65 KB        |
-| **Total CSS Bundle**        | 32.82 KB       | 6.54 KB          |
-| **Main Application Chunk**  | 322.37 KB      | 96.23 KB         |
-| **React Vendor Chunk**      | 104.06 KB      | 35.01 KB         |
+| **Total JavaScript Bundle** | 623.46 KB      | 196.16 KB        |
+| **Total CSS Bundle**        | 33.08 KB       | 6.6 KB           |
+| **Main Application Chunk**  | 326.76 KB      | 97.41 KB         |
+| **React Vendor Chunk**      | 104.08 KB      | 35.02 KB         |
 | **TanStack Query Chunk**    | 71.76 KB       | 21.36 KB         |
 | **Socket.IO Vendor Chunk**  | 40.72 KB       | 12.75 KB         |
 
 #### Headless Lighthouse Audit Scores
 
-- **Performance**: 73 / 100
+- **Performance**: 70 / 100
 - **Accessibility**: 95 / 100
 - **Best Practices**: 96 / 100
 - **SEO**: 82 / 100

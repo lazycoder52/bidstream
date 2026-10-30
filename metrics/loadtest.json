@@ -1,6 +1,6 @@
 {
-  "commitSha": "e69044d22ad26a143c2de2dffb42b6e547a012cd",
-  "timestamp": "2026-10-30T09:01:48.459Z",
+  "commitSha": "e477b87909417156715f3c7631a4e4563f294c6e",
+  "timestamp": "2026-10-30T19:43:45.763Z",
   "nodeVersion": "v22.23.4",
   "runnerSpecs": {
     "cpuModel": "AMD EPYC 9V45 96-Core Processor",
@@ -20,31 +20,33 @@
     "concurrencyEngine": "Pessimistic Row Lock (SELECT ... FOR UPDATE)"
   },
   "throughput": {
-    "requestsPerSecond": 2284.5,
-    "totalRequests": 160094,
-    "successfulRequests": 168,
-    "conflictResponses409": 64,
-    "errorRatePercent": 99.9
+    "requestsPerSecond": 559.1,
+    "totalRequests": 39197,
+    "successfulRequests": 27029,
+    "acceptedBids": 1726,
+    "rejectedBids": 26661,
+    "conflictResponses409": 25303,
+    "errorRatePercent": 31.04
   },
   "latencies": {
-    "httpBidP50Ms": 105.2,
-    "httpBidP90Ms": 220.8,
-    "httpBidP95Ms": 252.4,
+    "httpBidP50Ms": 920.9,
+    "httpBidP90Ms": 1088.2,
+    "httpBidP95Ms": 1138.5,
     "httpBidP99Ms": 0,
-    "httpBrowseP50Ms": 56.3,
-    "httpBrowseP95Ms": 251.8
+    "httpBrowseP50Ms": 209.3,
+    "httpBrowseP95Ms": 439.8
   },
   "realtime": {
     "connectedSocketClients": 50,
-    "broadcastDelayMinMs": 38,
-    "broadcastDelayP50Ms": 44,
-    "broadcastDelayP90Ms": 45,
-    "broadcastDelayP95Ms": 45,
-    "broadcastDelayMaxMs": 45
+    "broadcastDelayMinMs": 51,
+    "broadcastDelayP50Ms": 54,
+    "broadcastDelayP90Ms": 55,
+    "broadcastDelayP95Ms": 55,
+    "broadcastDelayMaxMs": 55
   },
   "invariants": {
     "auctionsAudited": 20,
-    "bidsAudited": 105,
+    "bidsAudited": 1727,
     "priceMismatchViolations": 0,
     "bidCountMismatchViolations": 0,
     "nonMonotonicViolations": 0,
