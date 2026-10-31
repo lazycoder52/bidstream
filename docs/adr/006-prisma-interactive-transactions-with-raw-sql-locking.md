@@ -45,5 +45,5 @@ This hybrid pattern preserves the strengths of both paradigms:
 
 ## Consequences
 
-- **Positive**: Complete concurrency safety without abandoning Prisma; optimal database throughput; parameterized SQL prevents injection vulnerabilities.
+- **Positive**: Complete concurrency safety without abandoning Prisma; the row lock serializes bids per auction, which keeps accepted bids strictly increasing; load results are in README Results; parameterized SQL prevents injection vulnerabilities.
 - **Negative**: Requires manually declared TypeScript interfaces (`interface LockedAuctionRow`) for raw query results; mitigated by centralized definitions in the respective service files.

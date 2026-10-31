@@ -17,7 +17,7 @@ Under intense load (e.g., 500 concurrent virtual users bidding simultaneously), 
 1. **Optimistic Concurrency Control (OCC) with Version / CAS**:
    - Each transaction reads `version`, validates bid logic in memory, and commits with `UPDATE auctions SET current_price = $amount, version = version + 1 WHERE id = $id AND version = $old_version`.
    - _Advantage_: Non-blocking reads, zero lock contention in low-contention domains.
-   - _Drawback_: Under intense contention (hundreds of concurrent bids on one auction), $N - 1$ out of $N$ concurrent transactions fail due to version mismatch. With retry storms, throughput collapses exponentially, database CPU spikes due to wasted transaction attempts, and retry queues exhaust server memory.
+   - _Drawback_: Under intense contention (hundreds of concurrent bids on one auction), $N - 1$ out of $N$ concurrent transactions fail due to version mismatch. With retry storms, most concurrent writers fail and must retry, database CPU spikes due to wasted transaction attempts, and retry queues exhaust server memory.
 2. **In-Memory Redis Lock (Redlock / Distributed Lock)**:
    - Acquire a distributed lock in Redis per auction before beginning a PostgreSQL transaction.
    - _Advantage_: Offloads locking coordination to Redis.
@@ -43,5 +43,5 @@ All external network operations (e.g. BullMQ job rescheduling, Socket.IO broadca
 
 ## Consequences
 
-- **Positive**: Zero lost updates under extreme concurrency. All accepted bids form a strictly monotonically increasing sequence. Database throughput scales predictably under load.
+- **Positive**: Zero lost updates under extreme concurrency. The row lock serializes bids per auction, which keeps accepted bids strictly increasing; load results are in README Results.
 - **Negative**: Long-running or stalled transactions would block other bidders on that specific auction; mitigated by setting transaction statement timeouts (`SET LOCAL statement_timeout = 2000`) and ensuring zero non-database side-effects occur inside the transaction block.
