@@ -81,22 +81,22 @@ All numbers in this section are generated directly by automated CI measurement r
 
 The load benchmark evaluates 500 concurrent virtual users executing a high-concurrency bidding storm across 20 active auctions alongside background browse-heavy traffic. Note: WebSocket broadcast latency is measured sequentially before the load storm by `scripts/measure-socket-latency.mjs` across 50 connected clients over 10 sample bid broadcasts (500 total event receipts) on an unloaded cluster, rather than concurrently during the 500-VU bidding storm.
 
-| Metric                                        | Measured Value              | Standard / Target |
-| --------------------------------------------- | --------------------------- | ----------------- |
-| **Sustained Throughput**                      | 515.2 req/s                 | > 500 req/s       |
-| **Total Benchmark Requests**                  | 36113 requests              | -                 |
-| **Accepted Bids**                             | 1606 bids                   | -                 |
-| **Rejected Bids (Contention/Outbid)**         | 24411 bids                  | -                 |
-| **HTTP Bid Latency (p50)**                    | 1016.7 ms                   | < 1000 ms         |
-| **HTTP Bid Latency (p90)**                    | 1157.9 ms                   | < 1200 ms         |
-| **HTTP Bid Latency (p95)**                    | 1189.8 ms                   | < 1200 ms         |
-| **HTTP Browse Latency (p50)**                 | 241.9 ms                    | < 300 ms          |
-| **HTTP Browse Latency (p95)**                 | 444.5 ms                    | < 500 ms          |
-| **WebSocket Broadcast Delay (p50, unloaded)** | 39 ms                       | < 60 ms           |
-| **WebSocket Broadcast Delay (p95, unloaded)** | 40 ms                       | < 60 ms           |
-| **WebSocket Broadcast Delay (max, unloaded)** | 40 ms                       | < 100 ms          |
-| **Simultaneous WebSocket Clients**            | 50 clients                  | 50 clients        |
-| **Database Invariant Violations**             | 0 violations (passed: true) | Exactly 0         |
+| Metric                                        | Measured Value              |
+| --------------------------------------------- | --------------------------- |
+| **Sustained Throughput**                      | 515.2 req/s                 |
+| **Total Benchmark Requests**                  | 36113 requests              |
+| **Accepted Bids**                             | 1606 bids                   |
+| **Rejected Bids (Contention/Outbid)**         | 24411 bids                  |
+| **HTTP Bid Latency (p50)**                    | 1016.7 ms                   |
+| **HTTP Bid Latency (p90)**                    | 1157.9 ms                   |
+| **HTTP Bid Latency (p95)**                    | 1189.8 ms                   |
+| **HTTP Browse Latency (p50)**                 | 241.9 ms                    |
+| **HTTP Browse Latency (p95)**                 | 444.5 ms                    |
+| **WebSocket Broadcast Delay (p50, unloaded)** | 39 ms                       |
+| **WebSocket Broadcast Delay (p95, unloaded)** | 40 ms                       |
+| **WebSocket Broadcast Delay (max, unloaded)** | 40 ms                       |
+| **Simultaneous WebSocket Clients**            | 50 clients                  |
+| **Database Invariant Violations**             | 0 violations (passed: true) |
 
 ### Web Performance & Bundle Audit (metrics/web.json)
 
@@ -227,12 +227,13 @@ For the automated CI pipeline that provisions PostgreSQL and Redis service conta
 ## Limitations
 
 1. **Single-Region PostgreSQL**: Pessimistic row locking requires interactive transactions on a primary database instance. Multi-region deployments require either region pinning or partition-based master routing.
-2. **Synchronous Lock Holding**: Bids holding the row lock block competing bidders until completion. To ensure sub-15ms p50 latency, transactions must never perform non-database operations (HTTP calls, email, disk I/O) within the lock boundary.
+2. **Synchronous Lock Holding**: Bids holding the row lock block competing bidders until completion. Transactions must never perform non-database operations (HTTP calls, email, disk I/O) within the lock boundary.
 3. **In-Memory WebSocket Gateway State**: While event distribution scales via Redis Pub/Sub, individual WebSocket socket connections are maintained in memory per instance. Reconnections trigger an explicit database replay step via `lastBidId`.
-4. **No Native Payment Processing**: In accordance with project boundaries, bid placement reserves authorization hold logic but does not integrate external payment gateway webhooks.
+4. **No payment processing**: bids carry no payment or authorization.
 5. **Load Test Throttler Override**: For load test benchmarks and CI smoke execution, the API rate throttler limit (`THROTTLE_LIMIT`) is overridden from the production default of 120 requests/minute to 50,000 requests/minute via environment configuration so high-volume concurrent traffic can be tested without synthetic client 429 rejections.
 6. **Load Storm Error Thresholds**: In the 30-second automated CI smoke suite, the HTTP failure threshold is enforced at `http_req_failed: ['rate<0.10']` with status codes 200, 201, and 409 registered as expected responses via `http.setResponseCallback(http.expectedStatuses(200, 201, 409))`. In the full 500-VU exploratory load benchmark, no arbitrary pass/fail latency or error thresholds are enforced (`thresholds: {}`) so raw empirical measurements under saturation are captured and exported to `metrics/loadtest.json` without artificial exit-code truncation.
 7. **WebSocket Broadcast Latency Measurement Scope**: Cross-instance WebSocket broadcast latency is measured by `scripts/measure-socket-latency.mjs` before the bidding storm begins. It samples exactly 10 sequential bids across 50 connected clients (500 total event receipts) on an unloaded, quiescent cluster to confirm multi-instance Redis Pub/Sub delivery. It does not measure broadcast delay concurrently under the 500-VU bidding storm, and the reported p95 is not a loaded p95.
+8. **Benchmark Run Variance**: The benchmark figures come from a single run on a shared 2-vCPU runner and vary between runs.
 
 ---
 
