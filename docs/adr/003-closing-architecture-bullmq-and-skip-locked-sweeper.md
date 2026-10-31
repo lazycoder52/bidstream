@@ -40,7 +40,7 @@ We implemented the **Double-Layered Hybrid Lifecycle Engine**.
               |                               |
               v                               v
     +-------------------+           +-------------------+
-    | BullMQ Worker     |           | 10s Sweeper       |
+    | BullMQ Worker     |           | Periodic Sweeper  |
     | (Exact end_time)  |           | (SKIP LOCKED)     |
     +-------------------+           +-------------------+
               |                               |
@@ -76,5 +76,5 @@ Inside the transactional close:
 
 ## Consequences
 
-- **Positive**: Sub-second close precision on normal execution; zero risk of abandoned auctions if Redis crashes or restarts; multiple workers race safely without double closures or split-brain winners.
+- **Positive**: Precise auction close timing on normal execution; zero risk of abandoned auctions if Redis crashes or restarts; multiple workers race safely without double closures or split-brain winners.
 - **Negative**: Requires maintenance of two closing trigger mechanisms; fully mitigated by encapsulating closure logic in a single idempotent service method (`LifecycleService.closeAuction`).
