@@ -1,11 +1,11 @@
 {
-  "commitSha": "05e94aca7a2bf45df76e58b0d465debc94b6de7d",
-  "timestamp": "2026-10-30T21:13:24.320Z",
+  "commitSha": "1e5fb7060998c223457fbde09f6977a4f72bcba0",
+  "timestamp": "2026-10-31T02:38:17.892Z",
   "nodeVersion": "v22.23.4",
   "runnerSpecs": {
-    "cpuModel": "AMD EPYC 9V45 96-Core Processor",
+    "cpuModel": "Intel(R) Xeon(R) 6973P-C",
     "cpuCores": 2,
-    "ramMb": 7933,
+    "ramMb": 7932,
     "os": "Linux 7.0.0-1017-azure (x64)"
   },
   "serviceVersions": {
@@ -46,7 +46,7 @@
     }
   },
   "lighthouse": {
-    "performance": 54,
+    "performance": 72,
     "accessibility": 95,
     "bestPractices": 96,
     "seo": 82
