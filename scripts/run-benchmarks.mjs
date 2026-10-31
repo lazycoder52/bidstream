@@ -90,20 +90,83 @@ async function runBenchmarkSuite() {
   const k6Summary = JSON.parse(fs.readFileSync(summaryExportPath, 'utf-8'));
   const m = k6Summary.metrics;
 
-  const totalReqs = m['http_reqs']?.values?.count ?? m['http_reqs']?.count ?? 0;
-  const reqRate = m['http_reqs']?.values?.rate ?? m['http_reqs']?.rate ?? 0;
-  const conflicts = m['bids_conflict_409']?.values?.count ?? m['bids_conflict_409']?.count ?? 0;
-  const accepted = m['bids_accepted']?.values?.count ?? m['bids_accepted']?.count ?? 0;
-  const rejected = m['bids_rejected']?.values?.count ?? m['bids_rejected']?.count ?? conflicts;
-  const bidDur = m['bid_latency_ms']?.values ?? m['bid_latency_ms'];
-  const browseDur = m['browse_latency_ms']?.values ?? m['browse_latency_ms'];
+  if (!m) {
+    console.error('FATAL: k6 summary export missing "metrics" object.');
+    process.exit(1);
+  }
 
-  // Real error rate computed directly from k6 http_req_failed metric
-  const reqFailedRate = m['http_req_failed']?.values?.rate ?? m['http_req_failed']?.rate ?? 0;
+  const totalReqs = m['http_reqs']?.count;
+  const reqRate = m['http_reqs']?.rate;
+  if (typeof totalReqs !== 'number' || typeof reqRate !== 'number') {
+    console.error('FATAL: http_reqs metric missing or malformed in k6 summary export.');
+    process.exit(1);
+  }
+
+  const accepted = m['bids_accepted']?.count;
+  if (typeof accepted !== 'number') {
+    console.error('FATAL: bids_accepted metric missing from k6 summary export.');
+    process.exit(1);
+  }
+
+  const conflicts = m['bids_conflict_409']?.count;
+  if (typeof conflicts !== 'number') {
+    console.error('FATAL: bids_conflict_409 metric missing from k6 summary export.');
+    process.exit(1);
+  }
+
+  const rejected = m['bids_rejected']?.count;
+  if (typeof rejected !== 'number') {
+    console.error('FATAL: bids_rejected metric missing from k6 summary export.');
+    process.exit(1);
+  }
+
+  const reqFailed = m['http_req_failed'];
+  const reqFailedRate =
+    typeof reqFailed?.value === 'number'
+      ? reqFailed.value
+      : typeof reqFailed?.rate === 'number'
+        ? reqFailed.rate
+        : null;
+
+  if (typeof reqFailedRate !== 'number') {
+    console.error('FATAL: http_req_failed metric missing or malformed in k6 summary export.');
+    process.exit(1);
+  }
   const errorRatePercent = Number((reqFailedRate * 100).toFixed(2));
 
-  if (!totalReqs || !bidDur) {
-    console.error('FATAL: Incomplete k6 metrics gathered from load storm.');
+  const bidDur = m['bid_latency_ms'];
+  if (!bidDur) {
+    console.error('FATAL: bid_latency_ms metric missing from k6 summary export.');
+    process.exit(1);
+  }
+
+  const bidP50 = typeof bidDur['p(50)'] === 'number' ? bidDur['p(50)'] : bidDur['med'];
+  const bidP90 = bidDur['p(90)'];
+  const bidP95 = bidDur['p(95)'];
+
+  if (
+    typeof bidP50 !== 'number' ||
+    typeof bidP90 !== 'number' ||
+    typeof bidP95 !== 'number'
+  ) {
+    console.error('FATAL: Required bid latency percentiles missing from k6 summary export.');
+    process.exit(1);
+  }
+
+  const browseDur = m['browse_latency_ms'];
+  if (!browseDur) {
+    console.error('FATAL: browse_latency_ms metric missing from k6 summary export.');
+    process.exit(1);
+  }
+
+  const browseP50 = typeof browseDur['p(50)'] === 'number' ? browseDur['p(50)'] : browseDur['med'];
+  const browseP95 = browseDur['p(95)'];
+
+  if (
+    typeof browseP50 !== 'number' ||
+    typeof browseP95 !== 'number'
+  ) {
+    console.error('FATAL: Required browse latency percentiles missing from k6 summary export.');
     process.exit(1);
   }
 
@@ -118,11 +181,11 @@ async function runBenchmarkSuite() {
   };
 
   const latencyMetrics = {
-    httpBidP50Ms: Number((bidDur['p(50)'] ?? bidDur['med'] ?? 0).toFixed(1)),
-    httpBidP90Ms: Number((bidDur['p(90)'] ?? 0).toFixed(1)),
-    httpBidP95Ms: Number((bidDur['p(95)'] ?? 0).toFixed(1)),
-    httpBrowseP50Ms: browseDur ? Number((browseDur['p(50)'] ?? browseDur['med'] ?? 0).toFixed(1)) : 0,
-    httpBrowseP95Ms: browseDur ? Number((browseDur['p(95)'] ?? 0).toFixed(1)) : 0,
+    httpBidP50Ms: Number(bidP50.toFixed(1)),
+    httpBidP90Ms: Number(bidP90.toFixed(1)),
+    httpBidP95Ms: Number(bidP95.toFixed(1)),
+    httpBrowseP50Ms: Number(browseP50.toFixed(1)),
+    httpBrowseP95Ms: Number(browseP95.toFixed(1)),
   };
 
   // 4. Invariant audit

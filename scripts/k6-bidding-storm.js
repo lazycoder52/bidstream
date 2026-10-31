@@ -6,6 +6,18 @@ import { Counter, Rate, Trend } from 'k6/metrics';
 const bidsAccepted = new Counter('bids_accepted');
 const bidsConflict409 = new Counter('bids_conflict_409');
 const bidsRejected = new Counter('bids_rejected');
+const bidsStatus201 = new Counter('bids_status_201');
+const bidsStatus400 = new Counter('bids_status_400');
+const bidsStatus401 = new Counter('bids_status_401');
+const bidsStatus403 = new Counter('bids_status_403');
+const bidsStatus404 = new Counter('bids_status_404');
+const bidsStatus409 = new Counter('bids_status_409');
+const bidsStatus429 = new Counter('bids_status_429');
+const bidsStatus500 = new Counter('bids_status_500');
+const bidsStatus502 = new Counter('bids_status_502');
+const bidsStatus503 = new Counter('bids_status_503');
+const bidsStatus504 = new Counter('bids_status_504');
+const bidsStatusOther = new Counter('bids_status_other');
 const bidLatency = new Trend('bid_latency_ms');
 const browseLatency = new Trend('browse_latency_ms');
 const successRate = new Rate('success_rate');
@@ -134,15 +146,39 @@ export function biddingFlow() {
 
   if (res.status === 201) {
     bidsAccepted.add(1);
+    bidsStatus201.add(1);
     successRate.add(1);
   } else if (res.status === 409) {
     // 409 Conflict is expected under intense concurrency due to outbids
     bidsConflict409.add(1);
+    bidsStatus409.add(1);
     bidsRejected.add(1);
     successRate.add(1);
   } else {
     bidsRejected.add(1);
     successRate.add(0);
+
+    if (res.status === 400) {
+      bidsStatus400.add(1);
+    } else if (res.status === 401) {
+      bidsStatus401.add(1);
+    } else if (res.status === 403) {
+      bidsStatus403.add(1);
+    } else if (res.status === 404) {
+      bidsStatus404.add(1);
+    } else if (res.status === 429) {
+      bidsStatus429.add(1);
+    } else if (res.status === 500) {
+      bidsStatus500.add(1);
+    } else if (res.status === 502) {
+      bidsStatus502.add(1);
+    } else if (res.status === 503) {
+      bidsStatus503.add(1);
+    } else if (res.status === 504) {
+      bidsStatus504.add(1);
+    } else {
+      bidsStatusOther.add(1);
+    }
   }
 
   sleep(0.05);
