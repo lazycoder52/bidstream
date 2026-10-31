@@ -37,16 +37,16 @@ describe('Idempotency Key Protocol & Replay Engine', () => {
       await testPrisma.$disconnect();
     } catch (err) {
       await testPrisma.$disconnect().catch(() => {});
-      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
-        throw new Error(
-          `Real PostgreSQL is required in CI for idempotency test suite, but database connection failed: ${err instanceof Error ? err.message : String(err)}`,
+      if (process.env['ALLOW_SKIP_LIVE_TESTS'] === 'true') {
+        console.warn(
+          'Real PostgreSQL is not reachable in this environment and ALLOW_SKIP_LIVE_TESTS=true is set. The idempotency suite did NOT run.',
         );
+        isPostgresAvailable = false;
+        return;
       }
-      console.warn(
-        'Real PostgreSQL is not reachable in this environment. Skipping live idempotency suite.',
+      throw new Error(
+        `Real PostgreSQL is required for idempotency test suite, but database connection failed: ${err instanceof Error ? err.message : String(err)}. Set ALLOW_SKIP_LIVE_TESTS=true to skip.`,
       );
-      isPostgresAvailable = false;
-      return;
     }
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -118,10 +118,15 @@ describe('Idempotency Key Protocol & Replay Engine', () => {
 
   it('replays exact identical response body and status code on duplicate submission', async () => {
     if (!isPostgresAvailable) {
-      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
-        throw new Error('Real PostgreSQL is required in CI for idempotency replay test');
+      if (process.env['ALLOW_SKIP_LIVE_TESTS'] === 'true') {
+        console.warn(
+          'Skipping test: Real PostgreSQL was not reachable and ALLOW_SKIP_LIVE_TESTS=true is set. This test did NOT run.',
+        );
+        return;
       }
-      return;
+      throw new Error(
+        'Real PostgreSQL is required for idempotency replay test. Set ALLOW_SKIP_LIVE_TESTS=true to skip.',
+      );
     }
     const idempotencyKey = `key-replay-${Date.now()}`;
 
@@ -157,10 +162,15 @@ describe('Idempotency Key Protocol & Replay Engine', () => {
 
   it('does not replay when a different idempotency key is provided', async () => {
     if (!isPostgresAvailable) {
-      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
-        throw new Error('Real PostgreSQL is required in CI for idempotency test');
+      if (process.env['ALLOW_SKIP_LIVE_TESTS'] === 'true') {
+        console.warn(
+          'Skipping test: Real PostgreSQL was not reachable and ALLOW_SKIP_LIVE_TESTS=true is set. This test did NOT run.',
+        );
+        return;
       }
-      return;
+      throw new Error(
+        'Real PostgreSQL is required for idempotency test. Set ALLOW_SKIP_LIVE_TESTS=true to skip.',
+      );
     }
     const buyer2 = await authService.register({
       email: `buyer2-idemp-${Date.now()}@example.com`,

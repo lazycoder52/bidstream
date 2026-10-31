@@ -143,7 +143,7 @@ The invariant audit verifies **0 violations** across all audited auctions.
 
 ## Reproduce
 
-The steps below demonstrate how to configure the environment, install dependencies, run migrations, execute test suites, and initiate benchmarks from a fresh repository clone on Linux or macOS.
+The steps below demonstrate how to configure the environment, install dependencies, run migrations, execute test suites, and initiate benchmarks from a fresh repository clone on Linux, macOS, or Windows.
 
 ### Prerequisites
 
@@ -152,11 +152,23 @@ The steps below demonstrate how to configure the environment, install dependenci
 
 ### Step 1: Environment Configuration & Infrastructure
 
-```bash
-# Copy example environment configuration
-cp .env.example .env
+Copy the example environment configuration:
 
-# Start backing PostgreSQL and Redis infrastructure containers
+**Bash (Linux / macOS):**
+
+```bash
+cp .env.example .env
+```
+
+**PowerShell (Windows):**
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Start backing PostgreSQL and Redis infrastructure containers:
+
+```bash
 docker compose up -d postgres redis
 ```
 
@@ -169,7 +181,20 @@ npm run build
 
 ### Step 3: Run Database Migrations
 
+Export `DATABASE_URL` so Prisma can connect to the PostgreSQL instance from the root workspace:
+
+**Bash (Linux / macOS):**
+
 ```bash
+export DATABASE_URL="postgresql://bidstream:bidstream_pass@localhost:5432/bidstream_db?schema=public"
+npm run prisma:generate
+npm run prisma:migrate:deploy
+```
+
+**PowerShell (Windows):**
+
+```powershell
+$env:DATABASE_URL="postgresql://bidstream:bidstream_pass@localhost:5432/bidstream_db?schema=public"
 npm run prisma:generate
 npm run prisma:migrate:deploy
 ```
@@ -184,7 +209,17 @@ npm run format:check
 
 ### Step 5: Execute Test Suites
 
+The live PostgreSQL and Redis test suites (`bidding.concurrency.spec.ts`, `idempotency.spec.ts`, and `realtime.multi-instance.spec.ts`) require live infrastructure and fail fast by default if PostgreSQL or Redis is unreachable. They do not silently skip unless `ALLOW_SKIP_LIVE_TESTS=true` is explicitly set in the environment (which logs a warning that the suite did NOT run).
+
+Export connection environment variables before executing the test suites:
+
+**Bash (Linux / macOS):**
+
 ```bash
+export DATABASE_URL="postgresql://bidstream:bidstream_pass@localhost:5432/bidstream_db?schema=public"
+export REDIS_HOST="localhost"
+export REDIS_PORT="6379"
+
 # Run unit and integration tests across all workspaces
 npm test
 
@@ -193,6 +228,32 @@ npm test -w @bidstream/api -- test/bidding.concurrency.spec.ts
 
 # Run the multi-instance Socket.IO Redis adapter synchronization test
 npm test -w @bidstream/api -- test/realtime.multi-instance.spec.ts
+
+# Optional: skip live database/redis tests explicitly if infrastructure is stopped
+# ALLOW_SKIP_LIVE_TESTS=true npm test
+
+# Run Playwright end-to-end browser tests
+npm run test:e2e
+```
+
+**PowerShell (Windows):**
+
+```powershell
+$env:DATABASE_URL="postgresql://bidstream:bidstream_pass@localhost:5432/bidstream_db?schema=public"
+$env:REDIS_HOST="localhost"
+$env:REDIS_PORT="6379"
+
+# Run unit and integration tests across all workspaces
+npm test
+
+# Run the 200-bid parallel PostgreSQL concurrency verification test
+npm test -w @bidstream/api -- test/bidding.concurrency.spec.ts
+
+# Run the multi-instance Socket.IO Redis adapter synchronization test
+npm test -w @bidstream/api -- test/realtime.multi-instance.spec.ts
+
+# Optional: skip live database/redis tests explicitly if infrastructure is stopped
+# $env:ALLOW_SKIP_LIVE_TESTS="true"; npm test; Remove-Item env:ALLOW_SKIP_LIVE_TESTS
 
 # Run Playwright end-to-end browser tests
 npm run test:e2e

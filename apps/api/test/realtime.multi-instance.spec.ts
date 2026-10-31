@@ -46,16 +46,16 @@ describe('Real-Time Multi-Instance Synchronization (Two In-Process Servers on Re
       isRedisAvailable = true;
     } catch (err) {
       testRedis.disconnect();
-      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
-        throw new Error(
-          `Redis is required in CI for multi-instance realtime test, but connection failed: ${err instanceof Error ? err.message : String(err)}`,
+      if (process.env['ALLOW_SKIP_LIVE_TESTS'] === 'true') {
+        console.warn(
+          'Redis is not reachable in this environment and ALLOW_SKIP_LIVE_TESTS=true is set. The multi-instance realtime suite did NOT run.',
         );
+        isRedisAvailable = false;
+        return;
       }
-      console.warn(
-        'Redis is not reachable in this environment. Skipping live multi-instance Redis adapter test.',
+      throw new Error(
+        `Redis is required for multi-instance realtime test, but connection failed: ${err instanceof Error ? err.message : String(err)}. Set ALLOW_SKIP_LIVE_TESTS=true to skip.`,
       );
-      isRedisAvailable = false;
-      return;
     }
 
     // Initialize Redis adapter clients for Server 1 (API process 1)
@@ -150,11 +150,16 @@ describe('Real-Time Multi-Instance Synchronization (Two In-Process Servers on Re
 
   it('propagates room broadcasts across isolated API server nodes via Redis Pub/Sub', async () => {
     if (!isRedisAvailable || !clientOnServer1 || !clientOnServer2 || !ioServer2) {
-      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
-        throw new Error('Redis is required in CI for multi-instance realtime test');
+      if (process.env['ALLOW_SKIP_LIVE_TESTS'] === 'true') {
+        console.warn(
+          'Skipping test: Redis was not reachable and ALLOW_SKIP_LIVE_TESTS=true is set. This test did NOT run.',
+        );
+        expect(true).toBe(true);
+        return;
       }
-      expect(true).toBe(true);
-      return;
+      throw new Error(
+        'Redis is required for multi-instance realtime test, but was not available. Set ALLOW_SKIP_LIVE_TESTS=true to skip.',
+      );
     }
 
     // Client 1 joins auction on Server 1
