@@ -67,7 +67,7 @@ Full architectural decision records are documented in [`docs/adr/`](docs/adr/):
 1. **[ADR-001: Pessimistic Row Locking vs Optimistic Versioning](docs/adr/001-pessimistic-locking-vs-optimistic-versioning.md)**: Under high contention (hundreds of concurrent bids on a closing auction), optimistic locking (`@version` / CAS) causes catastrophic transaction abort cascades and throughput collapse. BidStream uses PostgreSQL `SELECT ... FOR UPDATE` row locks inside `ReadCommitted` interactive transactions, queuing incoming bids serialized by a row lock with zero aborted retries.
 2. **[ADR-002: Idempotency Keys Design](docs/adr/002-idempotency-keys-design.md)**: Network retries from clients are deduplicated via an atomic `idempotency_keys` table inside the transaction boundary, storing and replaying original 201 responses with zero side effects.
 3. **[ADR-003: Double-Layer Closing Architecture](docs/adr/003-closing-architecture-bullmq-and-skip-locked-sweeper.md)**: Auction closing uses BullMQ delayed jobs as the primary millisecond-precision trigger (rescheduled dynamically upon anti-sniping extensions) combined with a periodic 10-second `SKIP LOCKED` database sweeper as a safety net against queue loss.
-4. **[ADR-004: Redis Adapter for Horizontal WebSocket Scaling](docs/adr/004-redis-adapter-horizontal-websocket-scaling.md)**: Real-time event broadcasting scales horizontally across multiple API processes via `@socket.io/redis-adapter` (tested with two in-process Socket.IO servers in `realtime.multi-instance.spec.ts`, and with two separate OS processes in `.github/workflows/benchmarks.yml` under 500-VU load storm). Clients reconnecting with `lastBidId` replay missed events directly from the append-only `bids` ledger.
+4. **[ADR-004: Redis Adapter for Horizontal WebSocket Scaling](docs/adr/004-redis-adapter-horizontal-websocket-scaling.md)**: Real-time event broadcasting scales horizontally across multiple API processes via `@socket.io/redis-adapter` (tested with two in-process Socket.IO servers in `realtime.multi-instance.spec.ts`, and with two separate OS processes in `.github/workflows/benchmarks.yml` across 50 connected clients). Clients reconnecting with `lastBidId` replay missed events directly from the append-only `bids` ledger.
 5. **[ADR-005: Shared Monorepo Zod Contracts](docs/adr/005-shared-zod-contracts-single-source-of-truth.md)**: `@bidstream/contracts` serves as the single source of truth for REST DTOs, WebSocket events, and environment schemas. The frontend API client parses and validates every HTTP response at runtime, preventing contract drift.
 6. **[ADR-006: Prisma Interactive Transactions with Raw SQL Locking](docs/adr/006-prisma-interactive-transactions-with-raw-sql-locking.md)**: Combines Prisma's ergonomic schema management and relational queries with parameterized `$queryRaw` row locks (`FOR UPDATE` and `FOR UPDATE SKIP LOCKED`) inside `$transaction` blocks.
 
@@ -79,24 +79,24 @@ All numbers in this section are generated directly by automated CI measurement r
 
 ### Load and Concurrency Benchmark (metrics/loadtest.json)
 
-The load benchmark evaluates 500 concurrent virtual users executing a high-concurrency bidding storm across 20 active auctions alongside background browse-heavy traffic.
+The load benchmark evaluates 500 concurrent virtual users executing a high-concurrency bidding storm across 20 active auctions alongside background browse-heavy traffic. Note: WebSocket broadcast latency is measured sequentially before the load storm by `scripts/measure-socket-latency.mjs` across 50 connected clients over 10 sample bid broadcasts (500 total event receipts) on an unloaded cluster, rather than concurrently during the 500-VU bidding storm.
 
-| Metric                                | Measured Value              | Standard / Target |
-| ------------------------------------- | --------------------------- | ----------------- |
-| **Sustained Throughput**              | 608.9 req/s                 | > 500 req/s       |
-| **Total Benchmark Requests**          | 42688 requests              | -                 |
-| **Accepted Bids**                     | 1899 bids                   | -                 |
-| **Rejected Bids (Contention/Outbid)** | 29223 bids                  | -                 |
-| **HTTP Bid Latency (p50)**            | 846.1 ms                    | < 1000 ms         |
-| **HTTP Bid Latency (p90)**            | 964.4 ms                    | < 1200 ms         |
-| **HTTP Bid Latency (p95)**            | 990.1 ms                    | < 1200 ms         |
-| **HTTP Browse Latency (p50)**         | 195.7 ms                    | < 300 ms          |
-| **HTTP Browse Latency (p95)**         | 384.7 ms                    | < 500 ms          |
-| **WebSocket Broadcast Delay (p50)**   | 34 ms                       | < 60 ms           |
-| **WebSocket Broadcast Delay (p95)**   | 35 ms                       | < 60 ms           |
-| **WebSocket Broadcast Delay (max)**   | 35 ms                       | < 100 ms          |
-| **Simultaneous WebSocket Clients**    | 50 clients                  | 50 clients        |
-| **Database Invariant Violations**     | 0 violations (passed: true) | Exactly 0         |
+| Metric                                        | Measured Value              | Standard / Target |
+| --------------------------------------------- | --------------------------- | ----------------- |
+| **Sustained Throughput**                      | 608.9 req/s                 | > 500 req/s       |
+| **Total Benchmark Requests**                  | 42688 requests              | -                 |
+| **Accepted Bids**                             | 1899 bids                   | -                 |
+| **Rejected Bids (Contention/Outbid)**         | 29223 bids                  | -                 |
+| **HTTP Bid Latency (p50)**                    | 846.1 ms                    | < 1000 ms         |
+| **HTTP Bid Latency (p90)**                    | 964.4 ms                    | < 1200 ms         |
+| **HTTP Bid Latency (p95)**                    | 990.1 ms                    | < 1200 ms         |
+| **HTTP Browse Latency (p50)**                 | 195.7 ms                    | < 300 ms          |
+| **HTTP Browse Latency (p95)**                 | 384.7 ms                    | < 500 ms          |
+| **WebSocket Broadcast Delay (p50, unloaded)** | 34 ms                       | < 60 ms           |
+| **WebSocket Broadcast Delay (p95, unloaded)** | 35 ms                       | < 60 ms           |
+| **WebSocket Broadcast Delay (max, unloaded)** | 35 ms                       | < 100 ms          |
+| **Simultaneous WebSocket Clients**            | 50 clients                  | 50 clients        |
+| **Database Invariant Violations**             | 0 violations (passed: true) | Exactly 0         |
 
 ### Web Performance & Bundle Audit (metrics/web.json)
 
@@ -232,6 +232,7 @@ For the automated CI pipeline that provisions PostgreSQL and Redis service conta
 4. **No Native Payment Processing**: In accordance with project boundaries, bid placement reserves authorization hold logic but does not integrate external payment gateway webhooks.
 5. **Load Test Throttler Override**: For load test benchmarks and CI smoke execution, the API rate throttler limit (`THROTTLE_LIMIT`) is overridden from the production default of 120 requests/minute to 50,000 requests/minute via environment configuration so high-volume concurrent traffic can be tested without synthetic client 429 rejections.
 6. **Load Storm Error Thresholds**: In the 30-second automated CI smoke suite, the HTTP failure threshold is enforced at `http_req_failed: ['rate<0.10']` with status codes 200, 201, and 409 registered as expected responses via `http.setResponseCallback(http.expectedStatuses(200, 201, 409))`. In the full 500-VU exploratory load benchmark, no arbitrary pass/fail latency or error thresholds are enforced (`thresholds: {}`) so raw empirical measurements under saturation are captured and exported to `metrics/loadtest.json` without artificial exit-code truncation.
+7. **WebSocket Broadcast Latency Measurement Scope**: Cross-instance WebSocket broadcast latency is measured by `scripts/measure-socket-latency.mjs` before the bidding storm begins. It samples exactly 10 sequential bids across 50 connected clients (500 total event receipts) on an unloaded, quiescent cluster to confirm multi-instance Redis Pub/Sub delivery. It does not measure broadcast delay concurrently under the 500-VU bidding storm, and the reported p95 is not a loaded p95.
 
 ---
 

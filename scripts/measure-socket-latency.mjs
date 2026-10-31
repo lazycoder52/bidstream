@@ -126,15 +126,7 @@ export async function measureSocketLatency({
   }
 
   if (latencies.length === 0) {
-    return {
-      connectedSocketClients: clientCount,
-      samples: 0,
-      broadcastDelayMinMs: 0,
-      broadcastDelayP50Ms: 0,
-      broadcastDelayP90Ms: 0,
-      broadcastDelayP95Ms: 0,
-      broadcastDelayMaxMs: 0,
-    };
+    throw new Error('No WebSocket broadcast receipts were recorded across the test window.');
   }
 
   latencies.sort((a, b) => a - b);
