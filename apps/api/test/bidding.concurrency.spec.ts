@@ -30,16 +30,16 @@ describe('High-Concurrency Bidding Engine (Real PostgreSQL)', () => {
       await prisma.$queryRaw`SELECT 1`;
       isPostgresAvailable = true;
     } catch (err) {
-      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
-        throw new Error(
-          `Real PostgreSQL is required in CI for bidding concurrency suite, but database connection failed: ${err instanceof Error ? err.message : String(err)}`,
+      if (process.env['ALLOW_SKIP_LIVE_TESTS'] === 'true') {
+        console.warn(
+          'Real PostgreSQL is not reachable in this environment and ALLOW_SKIP_LIVE_TESTS=true is set. The bidding concurrency suite did NOT run.',
         );
+        isPostgresAvailable = false;
+        return;
       }
-      console.warn(
-        'Real PostgreSQL is not reachable in this environment. Skipping live concurrency suite.',
+      throw new Error(
+        `Real PostgreSQL is required for bidding concurrency suite, but database connection failed: ${err instanceof Error ? err.message : String(err)}. Set ALLOW_SKIP_LIVE_TESTS=true to skip.`,
       );
-      isPostgresAvailable = false;
-      return;
     }
 
     const mockLifecycleService = {
@@ -125,13 +125,16 @@ describe('High-Concurrency Bidding Engine (Real PostgreSQL)', () => {
 
   it('correctly serializes 200 parallel bids without deadlocks or lost updates', async () => {
     if (!isPostgresAvailable) {
-      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
-        throw new Error(
-          'Real PostgreSQL is required in CI for 200-bid concurrency test, but was not available.',
+      if (process.env['ALLOW_SKIP_LIVE_TESTS'] === 'true') {
+        console.warn(
+          'Skipping test: Real PostgreSQL was not reachable and ALLOW_SKIP_LIVE_TESTS=true is set. This test did NOT run.',
         );
+        expect(true).toBe(true);
+        return;
       }
-      expect(true).toBe(true);
-      return;
+      throw new Error(
+        'Real PostgreSQL is required for 200-bid concurrency test, but was not available. Set ALLOW_SKIP_LIVE_TESTS=true to skip.',
+      );
     }
 
     const CONCURRENCY_COUNT = 200;
@@ -200,13 +203,16 @@ describe('High-Concurrency Bidding Engine (Real PostgreSQL)', () => {
 
   it('correctly handles 20 concurrent parallel requests with the identical idempotency key', async () => {
     if (!isPostgresAvailable) {
-      if (process.env.CI === 'true' || process.env['CI'] === 'true') {
-        throw new Error(
-          'Real PostgreSQL is required in CI for concurrent idempotency test, but was not available.',
+      if (process.env['ALLOW_SKIP_LIVE_TESTS'] === 'true') {
+        console.warn(
+          'Skipping test: Real PostgreSQL was not reachable and ALLOW_SKIP_LIVE_TESTS=true is set. This test did NOT run.',
         );
+        expect(true).toBe(true);
+        return;
       }
-      expect(true).toBe(true);
-      return;
+      throw new Error(
+        'Real PostgreSQL is required for concurrent idempotency test, but was not available. Set ALLOW_SKIP_LIVE_TESTS=true to skip.',
+      );
     }
 
     const testAuction = await prisma.auction.create({
