@@ -1,11 +1,11 @@
 {
-  "commitSha": "05e94aca7a2bf45df76e58b0d465debc94b6de7d",
-  "timestamp": "2026-10-30T21:14:00.306Z",
+  "commitSha": "1e5fb7060998c223457fbde09f6977a4f72bcba0",
+  "timestamp": "2026-10-31T02:38:49.369Z",
   "nodeVersion": "v22.23.4",
   "runnerSpecs": {
-    "cpuModel": "AMD EPYC 9V45 96-Core Processor",
+    "cpuModel": "Intel(R) Xeon(R) 6973P-C",
     "cpuCores": 2,
-    "ramMb": 7933,
+    "ramMb": 7932,
     "os": "Linux 7.0.0-1017-azure (x64)"
   },
   "serviceVersions": {
@@ -20,32 +20,32 @@
     "concurrencyEngine": "Pessimistic Row Lock (SELECT ... FOR UPDATE)"
   },
   "throughput": {
-    "requestsPerSecond": 608.9,
-    "totalRequests": 42688,
-    "successfulRequests": 29639,
-    "acceptedBids": 1899,
-    "rejectedBids": 29223,
-    "conflictResponses409": 27740,
-    "errorRatePercent": 0
+    "requestsPerSecond": 515.2,
+    "totalRequests": 36113,
+    "successfulRequests": 24703,
+    "acceptedBids": 1606,
+    "rejectedBids": 24411,
+    "conflictResponses409": 23097,
+    "errorRatePercent": 3.64
   },
   "latencies": {
-    "httpBidP50Ms": 846.1,
-    "httpBidP90Ms": 964.4,
-    "httpBidP95Ms": 990.1,
-    "httpBrowseP50Ms": 195.7,
-    "httpBrowseP95Ms": 384.7
+    "httpBidP50Ms": 1016.7,
+    "httpBidP90Ms": 1157.9,
+    "httpBidP95Ms": 1189.8,
+    "httpBrowseP50Ms": 241.9,
+    "httpBrowseP95Ms": 444.5
   },
   "realtime": {
     "connectedSocketClients": 50,
-    "broadcastDelayMinMs": 34,
-    "broadcastDelayP50Ms": 34,
-    "broadcastDelayP90Ms": 35,
-    "broadcastDelayP95Ms": 35,
-    "broadcastDelayMaxMs": 35
+    "broadcastDelayMinMs": 38,
+    "broadcastDelayP50Ms": 39,
+    "broadcastDelayP90Ms": 40,
+    "broadcastDelayP95Ms": 40,
+    "broadcastDelayMaxMs": 40
   },
   "invariants": {
     "auctionsAudited": 20,
-    "bidsAudited": 1900,
+    "bidsAudited": 1607,
     "priceMismatchViolations": 0,
     "bidCountMismatchViolations": 0,
     "nonMonotonicViolations": 0,
