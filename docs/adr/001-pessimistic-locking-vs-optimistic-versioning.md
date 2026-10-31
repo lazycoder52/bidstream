@@ -43,5 +43,5 @@ All external network operations (e.g. BullMQ job rescheduling, Socket.IO broadca
 
 ## Consequences
 
-- **Positive**: Zero lost updates under extreme concurrency. All accepted bids form a strictly monotonically increasing sequence. Database throughput scales predictably under load (averaging 1,420+ req/s with p50 bid latency of 14.2 ms).
+- **Positive**: Zero lost updates under extreme concurrency. All accepted bids form a strictly monotonically increasing sequence. Database throughput scales predictably under load.
 - **Negative**: Long-running or stalled transactions would block other bidders on that specific auction; mitigated by setting transaction statement timeouts (`SET LOCAL statement_timeout = 2000`) and ensuring zero non-database side-effects occur inside the transaction block.
