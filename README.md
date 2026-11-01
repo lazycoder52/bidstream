@@ -85,12 +85,13 @@ flowchart TD
     API1 -->|Interactive Tx Lock| PG
     API2 -->|Interactive Tx Lock| PG
 
-    Gateway <-->|@socket.io/redis-adapter| Redis
+    Gateway -->|Redis Pub/Sub Adapter| Redis
+    Redis -->|Broadcast Events| Gateway
     API1 -->|Throttling & Idempotency| Redis
     API2 -->|Throttling & Idempotency| Redis
 
     API1 -->|Enqueue Delayed Job| BullMQ
-    BullMQ <--> Redis
+    BullMQ -->|Queue State| Redis
     BullMQ -->|Idempotent Close| PG
 
     Contracts -.-> Web
