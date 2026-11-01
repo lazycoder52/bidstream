@@ -1,12 +1,52 @@
 # BidStream
 
-High-concurrency, real-time auction engine with mathematically proven correctness under intense bidding contention, backed by shared contracts, pessimistic row-level database locking, and an accessible React frontend.
+BidStream is a real-time auction engine built to guarantee transactional correctness and eliminate lost updates during high-concurrency bidding wars. It proves price consistency, monotonic increments, and multi-node broadcast synchronization through automated database invariant tests and clustered k6 load runs.
 
----
+## What It Demonstrates
+
+- **Pessimistic row-level locking**: Serializes concurrent bids per auction in [`apps/api/src/bids/bids.service.ts`](apps/api/src/bids/bids.service.ts) using PostgreSQL `SELECT ... FOR UPDATE`, verified by 200 concurrent requests in [`apps/api/test/bidding.concurrency.spec.ts`](apps/api/test/bidding.concurrency.spec.ts).
+- **Idempotency key protocol**: Atomically records keys and caches responses inside the transaction in [`apps/api/src/bids/bids.service.ts`](apps/api/src/bids/bids.service.ts), verified in [`apps/api/test/idempotency.spec.ts`](apps/api/test/idempotency.spec.ts).
+- **Anti-sniping extensions**: Extends auction deadlines when bids arrive in closing minutes in [`apps/api/src/bids/bids.service.ts`](apps/api/src/bids/bids.service.ts) and [`apps/api/src/lifecycle/lifecycle.service.ts`](apps/api/src/lifecycle/lifecycle.service.ts).
+- **Double-layer closing architecture**: Pairs BullMQ delayed close jobs with a periodic `SKIP LOCKED` PostgreSQL sweeper in [`apps/api/src/lifecycle/sweeper.service.ts`](apps/api/src/lifecycle/sweeper.service.ts), verified in [`apps/api/test/lifecycle.resilience.spec.ts`](apps/api/test/lifecycle.resilience.spec.ts).
+- **Redis adapter real-time sync**: Broadcasts auction events horizontally across API nodes via `@socket.io/redis-adapter` in [`apps/api/src/realtime/redis-io.adapter.ts`](apps/api/src/realtime/redis-io.adapter.ts), verified in [`apps/api/test/realtime.multi-instance.spec.ts`](apps/api/test/realtime.multi-instance.spec.ts).
+- **Shared runtime contracts**: Single source of truth for DTO schemas, WebSocket events, and TypeScript interfaces across frontend and backend in [`packages/contracts/src/index.ts`](packages/contracts/src/index.ts).
+
+## Tech Stack
+
+| Layer               | Technology                                                                     |
+| ------------------- | ------------------------------------------------------------------------------ |
+| Frontend            | React 19, Vite, Tailwind CSS v4, Zustand, TanStack Query                       |
+| Backend             | NestJS, Express, Socket.IO, BullMQ, Prisma ORM                                 |
+| Persistence & Cache | PostgreSQL 16 (`SELECT ... FOR UPDATE`), Redis 7 (Pub/Sub adapter & throttler) |
+| Tooling & Contracts | Zod, TypeScript, Docker Compose, Vitest, Jest, Playwright, k6                  |
+
+## Quick Start
+
+Prerequisites: Node.js 22 LTS, Docker & Docker Compose.
+
+**Bash:**
+
+```bash
+cp .env.example .env && docker compose up -d postgres redis
+npm install && npm run build
+export DATABASE_URL="postgresql://bidstream:bidstream_pass@localhost:5432/bidstream_db?schema=public"
+npm run prisma:generate && npm run prisma:migrate:deploy && npm test
+```
+
+**PowerShell:**
+
+```powershell
+Copy-Item .env.example .env; docker compose up -d postgres redis
+npm install; npm run build
+$env:DATABASE_URL="postgresql://bidstream:bidstream_pass@localhost:5432/bidstream_db?schema=public"
+npm run prisma:generate; npm run prisma:migrate:deploy; npm test
+```
+
+For the complete multi-instance setup, load tests, and invariant checks, see [Reproduce](#reproduce).
 
 ## Architecture
 
-BidStream is engineered as an npm workspaces monorepo separating domain contracts, real-time backend services, and a modern single-page frontend.
+BidStream separates domain contracts, backend API instances, and the single-page client across an npm workspaces monorepo.
 
 ```mermaid
 flowchart TD
@@ -58,24 +98,32 @@ flowchart TD
     Contracts -.-> API2
 ```
 
----
+When a bid request arrives, the API starts a PostgreSQL interactive transaction with Read Committed isolation. Inside the transaction, it locks the auction row using `SELECT ... FOR UPDATE` to serialize concurrent bidders without deadlocks. The service evaluates the idempotency key, immediately returning the cached payload if the key was already committed. Under the lock, the service verifies bid increments, appends a record to the `bids` ledger, updates the auction price and end time, and commits. Once the transaction commits, the API emits the update through Socket.IO and the Redis adapter broadcasts it to connected clients across all nodes.
 
 ## Design Decisions
 
-Full architectural decision records are documented in [`docs/adr/`](docs/adr/):
+- **[ADR-001: Pessimistic Row Locking vs Optimistic Versioning](docs/adr/001-pessimistic-locking-vs-optimistic-versioning.md)**: PostgreSQL `SELECT ... FOR UPDATE` row locks eliminate abort cascades and retry storms under high contention.
+- **[ADR-002: Idempotency Keys Design](docs/adr/002-idempotency-keys-design.md)**: Atomic idempotency key tracking inside the transaction guarantees duplicate network requests return cached responses without duplicate bids.
+- **[ADR-003: Double-Layer Closing Architecture](docs/adr/003-closing-architecture-bullmq-and-skip-locked-sweeper.md)**: BullMQ delayed jobs deliver precise auction closing, paired with a periodic `SKIP LOCKED` sweeper to recover from job loss.
+- **[ADR-004: Redis Adapter for Horizontal WebSocket Scaling](docs/adr/004-redis-adapter-horizontal-websocket-scaling.md)**: `@socket.io/redis-adapter` distributes room broadcasts across multiple API nodes, with reconnecting clients catching up via `lastBidId`.
+- **[ADR-005: Shared Monorepo Zod Contracts](docs/adr/005-shared-zod-contracts-single-source-of-truth.md)**: `@bidstream/contracts` serves as the single source of truth for DTOs and WebSocket events, validated at runtime by both client and server.
+- **[ADR-006: Prisma Interactive Transactions with Raw SQL Locking](docs/adr/006-prisma-interactive-transactions-with-raw-sql-locking.md)**: Combines Prisma type safety and migrations with raw SQL row locks inside interactive transactions.
 
-1. **[ADR-001: Pessimistic Row Locking vs Optimistic Versioning](docs/adr/001-pessimistic-locking-vs-optimistic-versioning.md)**: Under high contention (hundreds of concurrent bids on a closing auction), optimistic locking (`@version` / CAS) causes catastrophic transaction abort cascades and throughput collapse. BidStream uses PostgreSQL `SELECT ... FOR UPDATE` row locks inside `ReadCommitted` interactive transactions, queuing incoming bids serialized by a row lock with zero aborted retries.
-2. **[ADR-002: Idempotency Keys Design](docs/adr/002-idempotency-keys-design.md)**: Network retries from clients are deduplicated via an atomic `idempotency_keys` table inside the transaction boundary, storing and replaying original 201 responses with zero side effects.
-3. **[ADR-003: Double-Layer Closing Architecture](docs/adr/003-closing-architecture-bullmq-and-skip-locked-sweeper.md)**: Auction closing uses BullMQ delayed jobs as the primary millisecond-precision trigger (rescheduled dynamically upon anti-sniping extensions) combined with a periodic 10-second `SKIP LOCKED` database sweeper as a safety net against queue loss.
-4. **[ADR-004: Redis Adapter for Horizontal WebSocket Scaling](docs/adr/004-redis-adapter-horizontal-websocket-scaling.md)**: Real-time event broadcasting scales horizontally across multiple API processes via `@socket.io/redis-adapter` (tested with two in-process Socket.IO servers in `realtime.multi-instance.spec.ts`, and with two separate OS processes in `.github/workflows/benchmarks.yml` across 50 connected clients). Clients reconnecting with `lastBidId` replay missed events directly from the append-only `bids` ledger.
-5. **[ADR-005: Shared Monorepo Zod Contracts](docs/adr/005-shared-zod-contracts-single-source-of-truth.md)**: `@bidstream/contracts` serves as the single source of truth for REST DTOs, WebSocket events, and environment schemas. The frontend API client parses and validates every HTTP response at runtime, preventing contract drift.
-6. **[ADR-006: Prisma Interactive Transactions with Raw SQL Locking](docs/adr/006-prisma-interactive-transactions-with-raw-sql-locking.md)**: Combines Prisma's ergonomic schema management and relational queries with parameterized `$queryRaw` row locks (`FOR UPDATE` and `FOR UPDATE SKIP LOCKED`) inside `$transaction` blocks.
+## Testing
 
----
+| Suite                      | What It Proves                                                                               | Command                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Concurrency                | Serializes 200 concurrent bids on one auction with zero lost updates                         | `npm test -w @bidstream/api -- test/bidding.concurrency.spec.ts`     |
+| Idempotency                | Returns exact cached responses on duplicate idempotency keys without extra bids              | `npm test -w @bidstream/api -- test/idempotency.spec.ts`             |
+| Multi-Instance Realtime    | Distributes WebSocket broadcasts across distinct API nodes via Redis adapter                 | `npm test -w @bidstream/api -- test/realtime.multi-instance.spec.ts` |
+| Lifecycle Resilience       | Handles concurrent closing workers and recovers overdue auctions via sweeper                 | `npm test -w @bidstream/api -- test/lifecycle.resilience.spec.ts`    |
+| Frontend Flows (MSW)       | Intercepts HTTP/WS, asserting optimistic bid rollbacks on 409 conflict and schema validation | `npm test -w @bidstream/web`                                         |
+| E2E Workflows (Playwright) | Multi-browser buyer/seller bidding flows, live updates, and error rollbacks                  | `npm run test:e2e`                                                   |
+| Load Smoke & Invariants    | Runs a 30s k6 bidding storm against the stack and verifies 6 database invariants             | `docker compose up -d && node scripts/check-invariants.mjs`          |
 
-## Verified Results
+## Results
 
-All numbers in this section are generated directly by automated CI measurement runs (GitHub Actions runner, load generator and server share the machine) via `.github/workflows/benchmarks.yml` and saved to `metrics/*.json`. An automated verification test (`scripts/verify-readme-metrics.mjs`) asserts that these figures match the source metrics files without discrepancies.
+All figures are measured from automated CI runs (GitHub Actions runner, load generator and server share the machine) via `.github/workflows/benchmarks.yml` and stored in `metrics/*.json`. The benchmark results come from a single run on a shared 2-vCPU runner and vary between runs.
 
 ### Load and Concurrency Benchmark (metrics/loadtest.json)
 
@@ -100,7 +148,7 @@ The load benchmark evaluates 500 concurrent virtual users executing a high-concu
 
 ### Web Performance & Bundle Audit (metrics/web.json)
 
-Bundle size measurements were collected via production build analysis of the React 19 single-page application. Route-level code splitting is implemented across all routes (`/auctions`, `/auctions/:id`, `/auctions/create`, `/dashboard`, `/login`, `/register`) using dynamic `React.lazy` imports wrapped with `<Suspense>`, ensuring secondary routes are loaded on demand.
+Bundle size measurements were collected via production build analysis of the React 19 single-page application. Route-level code splitting is implemented across all routes using dynamic `React.lazy` imports wrapped with `<Suspense>`, ensuring secondary routes are loaded on demand.
 
 - **Initial-Load JavaScript (gzip)**: **97.41 KB** (`mainIndex` entry chunk transferred over the wire)
 - **Total Initial Transfer (JS + CSS gzip)**: **104.01 KB**
@@ -122,183 +170,80 @@ Bundle size measurements were collected via production build analysis of the Rea
 - **Best Practices**: 96 / 100
 - **SEO**: 82 / 100
 
----
-
-## Database Invariants
-
-The database invariant verification suite asserts zero discrepancies across auction price synchronization, bid count integrity, strict bid amount monotonicity, duplicate bid prevention, foreign key referential consistency, and terminal auction winner resolution.
-
-Following every load storm and concurrency test run, `scripts/check-invariants.mjs` executes a database audit verifying six core invariants:
-
-1. **Current Price Consistency**: For every auction, `current_price` precisely matches `MAX(bids.amount)` of accepted bids (or `starting_price` if 0 bids exist).
-2. **Bid Count Integrity**: Auction `bid_count` strictly equals `COUNT(bids.id)`.
-3. **Strict Monotonicity**: All accepted bids on any auction form a strictly monotonically increasing sequence (`bid[i].amount > bid[i-1].amount`).
-4. **Duplicate Prevention**: Zero duplicate accepted bids exist with identical amounts for the same auction.
-5. **Referential Integrity**: Zero orphan bids exist referencing deleted or non-existent auctions.
-6. **Lifecycle Correctness**: Ended auctions have `status = 'ENDED'` with `winner_id` correctly resolved based on reserve price constraints.
-
-The invariant audit verifies **0 violations** across all audited auctions.
-
----
-
-## Reproduce
-
-The steps below demonstrate how to configure the environment, install dependencies, run migrations, execute test suites, and initiate benchmarks from a fresh repository clone on Linux, macOS, or Windows.
-
-### Prerequisites
-
-- Node.js 22 LTS
-- Docker and Docker Compose (for PostgreSQL 16 and Redis 7)
-
-### Step 1: Environment Configuration & Infrastructure
-
-Copy the example environment configuration:
-
-**Bash (Linux / macOS):**
-
-```bash
-cp .env.example .env
-```
-
-**PowerShell (Windows):**
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Start backing PostgreSQL and Redis infrastructure containers:
-
-```bash
-docker compose up -d postgres redis
-```
-
-### Step 2: Install Dependencies & Build Packages
-
-```bash
-npm install
-npm run build
-```
-
-### Step 3: Run Database Migrations
-
-Export `DATABASE_URL` so Prisma can connect to the PostgreSQL instance from the root workspace:
-
-**Bash (Linux / macOS):**
-
-```bash
-export DATABASE_URL="postgresql://bidstream:bidstream_pass@localhost:5432/bidstream_db?schema=public"
-npm run prisma:generate
-npm run prisma:migrate:deploy
-```
-
-**PowerShell (Windows):**
-
-```powershell
-$env:DATABASE_URL="postgresql://bidstream:bidstream_pass@localhost:5432/bidstream_db?schema=public"
-npm run prisma:generate
-npm run prisma:migrate:deploy
-```
-
-### Step 4: Run Static Checks & Typecheck
-
-```bash
-npm run typecheck
-npm run lint
-npm run format:check
-```
-
-### Step 5: Execute Test Suites
-
-The live PostgreSQL and Redis test suites (`bidding.concurrency.spec.ts`, `idempotency.spec.ts`, and `realtime.multi-instance.spec.ts`) require live infrastructure and fail fast by default if PostgreSQL or Redis is unreachable. They do not silently skip unless `ALLOW_SKIP_LIVE_TESTS=true` is explicitly set in the environment (which logs a warning that the suite did NOT run).
-
-Export connection environment variables before executing the test suites:
-
-**Bash (Linux / macOS):**
-
-```bash
-export DATABASE_URL="postgresql://bidstream:bidstream_pass@localhost:5432/bidstream_db?schema=public"
-export REDIS_HOST="localhost"
-export REDIS_PORT="6379"
-
-# Run unit and integration tests across all workspaces
-npm test
-
-# Run the 200-bid parallel PostgreSQL concurrency verification test
-npm test -w @bidstream/api -- test/bidding.concurrency.spec.ts
-
-# Run the multi-instance Socket.IO Redis adapter synchronization test
-npm test -w @bidstream/api -- test/realtime.multi-instance.spec.ts
-
-# Optional: skip live database/redis tests explicitly if infrastructure is stopped
-# ALLOW_SKIP_LIVE_TESTS=true npm test
-
-# Run Playwright end-to-end browser tests
-npm run test:e2e
-```
-
-**PowerShell (Windows):**
-
-```powershell
-$env:DATABASE_URL="postgresql://bidstream:bidstream_pass@localhost:5432/bidstream_db?schema=public"
-$env:REDIS_HOST="localhost"
-$env:REDIS_PORT="6379"
-
-# Run unit and integration tests across all workspaces
-npm test
-
-# Run the 200-bid parallel PostgreSQL concurrency verification test
-npm test -w @bidstream/api -- test/bidding.concurrency.spec.ts
-
-# Run the multi-instance Socket.IO Redis adapter synchronization test
-npm test -w @bidstream/api -- test/realtime.multi-instance.spec.ts
-
-# Optional: skip live database/redis tests explicitly if infrastructure is stopped
-# $env:ALLOW_SKIP_LIVE_TESTS="true"; npm test; Remove-Item env:ALLOW_SKIP_LIVE_TESTS
-
-# Run Playwright end-to-end browser tests
-npm run test:e2e
-```
-
-### Step 6: Run Load Benchmark & Invariant Audit
-
-To evaluate the high-concurrency bidding storm across two clustered API instances with the rate limit loosened:
-
-```bash
-# Start dual API instances connected via Redis adapter with THROTTLE_LIMIT override
-THROTTLE_LIMIT=50000 PORT=3001 node apps/api/dist/main.js &
-THROTTLE_LIMIT=50000 PORT=3002 node apps/api/dist/main.js &
-
-# Execute load benchmark targeting both instances and write metrics/loadtest.json
-API_URLS=http://localhost:3001,http://localhost:3002 SUBSCRIBER_URL=http://localhost:3001 PUBLISHER_URL=http://localhost:3002 node scripts/run-benchmarks.mjs
-
-# Run database invariant verification
-npm run test:invariants
-
-# Run web bundle measurement and write metrics/web.json
-npm run test:measure-web
-
-# Verify that README.md figures match metrics/*.json exactly
-npm run test:verify-readme
-```
-
-For the automated CI pipeline that provisions PostgreSQL and Redis service containers, runs the dual-node storm under 500 VUs, and publishes metrics artifacts, refer to [.github/workflows/benchmarks.yml](.github/workflows/benchmarks.yml).
-
----
-
 ## Limitations
 
 1. **Single-Region PostgreSQL**: Pessimistic row locking requires interactive transactions on a primary database instance. Multi-region deployments require either region pinning or partition-based master routing.
 2. **Synchronous Lock Holding**: Bids holding the row lock block competing bidders until completion. Transactions must never perform non-database operations (HTTP calls, email, disk I/O) within the lock boundary.
-3. **In-Memory WebSocket Gateway State**: While event distribution scales via Redis Pub/Sub, individual WebSocket socket connections are maintained in memory per instance. Reconnections trigger an explicit database replay step via `lastBidId`.
-4. **No payment processing**: bids carry no payment or authorization.
-5. **Load Test Throttler Override**: For load test benchmarks and CI smoke execution, the API rate throttler limit (`THROTTLE_LIMIT`) is overridden from the production default of 120 requests/minute to 50,000 requests/minute via environment configuration so high-volume concurrent traffic can be tested without synthetic client 429 rejections.
-6. **Load Storm Error Thresholds**: In the 30-second automated CI smoke suite, the HTTP failure threshold is enforced at `http_req_failed: ['rate<0.10']` with status codes 200, 201, and 409 registered as expected responses via `http.setResponseCallback(http.expectedStatuses(200, 201, 409))`. In the full 500-VU exploratory load benchmark, no arbitrary pass/fail latency or error thresholds are enforced (`thresholds: {}`) so raw empirical measurements under saturation are captured and exported to `metrics/loadtest.json` without artificial exit-code truncation.
-7. **WebSocket Broadcast Latency Measurement Scope**: Cross-instance WebSocket broadcast latency is measured by `scripts/measure-socket-latency.mjs` before the bidding storm begins. It samples exactly 10 sequential bids across 50 connected clients (500 total event receipts) on an unloaded, quiescent cluster to confirm multi-instance Redis Pub/Sub delivery. It does not measure broadcast delay concurrently under the 500-VU bidding storm, and the reported p95 is not a loaded p95.
+3. **In-Memory WebSocket Gateway State**: While event distribution scales via Redis Pub/Sub, individual WebSocket connections are maintained in memory per instance. Reconnections trigger an explicit database replay step via `lastBidId`.
+4. **No Payment Processing**: Bids carry no payment or authorization hold logic.
+5. **Load Test Throttler Override**: For load test benchmarks and CI smoke execution, the API rate throttler limit (`THROTTLE_LIMIT`) is overridden from the production default of 120 requests/minute to 50,000 requests/minute so high-volume concurrent traffic can be tested without synthetic client 429 rejections.
+6. **Load Storm Error Thresholds**: In the 30-second automated CI smoke suite, the HTTP failure threshold is enforced at `http_req_failed: ['rate<0.10']` with status codes 200, 201, and 409 registered as expected responses via `http.setResponseCallback(http.expectedStatuses(200, 201, 409))`. In the full 500-VU exploratory load benchmark, no pass/fail thresholds are enforced (`thresholds: {}`) so raw empirical measurements under saturation are captured and exported to `metrics/loadtest.json` without artificial truncation.
+7. **WebSocket Broadcast Latency Measurement Scope**: Cross-instance WebSocket broadcast latency is measured by `scripts/measure-socket-latency.mjs` before the bidding storm begins. It samples 10 sequential bids across 50 connected clients (500 total receipts) on an unloaded cluster to confirm multi-instance Redis Pub/Sub delivery. It does not measure broadcast delay concurrently under the 500-VU bidding storm, and the reported p95 is not a loaded p95.
 8. **Benchmark Run Variance**: The benchmark figures come from a single run on a shared 2-vCPU runner and vary between runs.
-9. **Implementation History**: The original plan had 10 phase PRs and 6 were made, and one metrics commit (0984179) went directly to main.
+9. **Implementation History**: The original roadmap planned 10 milestone pull requests and 6 were merged, and commit 0984179 went directly to main.
 
----
+## Reproduce
+
+Prerequisites: Node.js 22 LTS, Docker & Docker Compose. Live database and Redis tests fail fast by default if infrastructure is unreachable; pass `ALLOW_SKIP_LIVE_TESTS=true` to skip them with a warning.
+
+### Bash (Linux / macOS)
+
+```bash
+# 1. Environment & Infrastructure
+cp .env.example .env && docker compose up -d postgres redis
+
+# 2. Build & Migrations
+npm install && npm run build
+export DATABASE_URL="postgresql://bidstream:bidstream_pass@localhost:5432/bidstream_db?schema=public"
+npm run prisma:generate && npm run prisma:migrate:deploy
+
+# 3. Static Checks & Typecheck
+npm run typecheck && npm run lint && npm run format:check
+
+# 4. Test Suites
+export REDIS_HOST="localhost"
+export REDIS_PORT="6379"
+npm test
+npm test -w @bidstream/api -- test/bidding.concurrency.spec.ts
+npm test -w @bidstream/api -- test/realtime.multi-instance.spec.ts
+npm run test:e2e
+
+# 5. Clustered Load Benchmark & Invariants
+THROTTLE_LIMIT=50000 PORT=3001 node apps/api/dist/main.js &
+THROTTLE_LIMIT=50000 PORT=3002 node apps/api/dist/main.js &
+API_URLS=http://localhost:3001,http://localhost:3002 SUBSCRIBER_URL=http://localhost:3001 PUBLISHER_URL=http://localhost:3002 node scripts/run-benchmarks.mjs
+npm run test:invariants && npm run test:measure-web && npm run test:verify-readme
+```
+
+### PowerShell (Windows)
+
+```powershell
+# 1. Environment & Infrastructure
+Copy-Item .env.example .env; docker compose up -d postgres redis
+
+# 2. Build & Migrations
+npm install; npm run build
+$env:DATABASE_URL="postgresql://bidstream:bidstream_pass@localhost:5432/bidstream_db?schema=public"
+npm run prisma:generate; npm run prisma:migrate:deploy
+
+# 3. Static Checks & Typecheck
+npm run typecheck; npm run lint; npm run format:check
+
+# 4. Test Suites
+$env:REDIS_HOST="localhost"
+$env:REDIS_PORT="6379"
+npm test
+npm test -w @bidstream/api -- test/bidding.concurrency.spec.ts
+npm test -w @bidstream/api -- test/realtime.multi-instance.spec.ts
+npm run test:e2e
+
+# 5. Clustered Load Benchmark & Invariants
+$env:THROTTLE_LIMIT="50000"; Start-Process node -ArgumentList "apps/api/dist/main.js" -Environment @{ PORT="3001"; THROTTLE_LIMIT="50000" }
+Start-Process node -ArgumentList "apps/api/dist/main.js" -Environment @{ PORT="3002"; THROTTLE_LIMIT="50000" }
+$env:API_URLS="http://localhost:3001,http://localhost:3002"; $env:SUBSCRIBER_URL="http://localhost:3001"; $env:PUBLISHER_URL="http://localhost:3002"; node scripts/run-benchmarks.mjs
+npm run test:invariants; npm run test:measure-web; npm run test:verify-readme
+```
 
 ## AI Tools Used
 
-The initial project structure, architectural planning, boilerplate scaffolding, and test implementations were developed with the assistance of Google DeepMind's Antigravity agentic coding assistant. All system architectures, concurrency primitives, invariant validation rules, and benchmark scripts were verified through local service containers and automated test suites.
+This codebase was developed with the assistance of an AI coding agent working under direct direction. The human engineer specified all requirements, architectures, concurrency patterns, and invariant validation rules, while reviewing every pull request and verifying results. All test outputs, bundle measurements, and performance figures are produced by automated execution scripts, not derived from agent assertions.
