@@ -181,7 +181,6 @@ Bundle size measurements were collected via production build analysis of the Rea
 6. **Load Storm Error Thresholds**: In the 30-second automated CI smoke suite, the HTTP failure threshold is enforced at `http_req_failed: ['rate<0.10']` with status codes 200, 201, and 409 registered as expected responses via `http.setResponseCallback(http.expectedStatuses(200, 201, 409))`. In the full 500-VU exploratory load benchmark, no pass/fail thresholds are enforced (`thresholds: {}`) so raw empirical measurements under saturation are captured and exported to `metrics/loadtest.json` without artificial truncation.
 7. **WebSocket Broadcast Latency Measurement Scope**: Cross-instance WebSocket broadcast latency is measured by `scripts/measure-socket-latency.mjs` before the bidding storm begins. It samples 10 sequential bids across 50 connected clients (500 total receipts) on an unloaded cluster to confirm multi-instance Redis Pub/Sub delivery. It does not measure broadcast delay concurrently under the 500-VU bidding storm, and the reported p95 is not a loaded p95.
 8. **Benchmark Run Variance**: The benchmark figures come from a single run on a shared 2-vCPU runner and vary between runs.
-9. **Implementation History**: The original roadmap planned 10 milestone pull requests and 6 were merged, and commit 0984179 went directly to main.
 
 ## Reproduce
 
@@ -247,4 +246,4 @@ npm run test:invariants; npm run test:measure-web; npm run test:verify-readme
 
 ## AI Tools Used
 
-This codebase was developed with the assistance of an AI coding agent working under direct direction. The human engineer specified all requirements, architectures, concurrency patterns, and invariant validation rules, while reviewing every pull request and verifying results. All test outputs, bundle measurements, and performance figures are produced by automated execution scripts, not derived from agent assertions.
+This codebase was developed with the assistance of an AI coding agent working under direct direction. The human engineer directed the architecture, database concurrency patterns, lifecycle invariants, and verification criteria, running and validating automated tests and benchmarks at each step. All test outputs, bundle measurements, and performance figures are produced by automated execution scripts, not derived from agent assertions.

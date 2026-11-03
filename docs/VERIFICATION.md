@@ -130,3 +130,9 @@ This document provides a transparent and unembellished audit of the test coverag
    - Configure `.gitattributes`, Prettier `endOfLine: lf`, `gitleaks`, `npm audit`, CORS allowlist, and secure refresh-cookie protections.
 7. **README Refinement**:
    - Replace "FIFO" wording with "serialized by a row lock", report initial-load JS gzip, confirm lazy loading, and document limitations.
+
+---
+
+## (d) Implementation & Branch History
+
+The original roadmap planned 10 milestone pull requests; 6 were merged through standard review and CI workflows, and commit `0984179` was pushed directly to `main` during setup consolidation.
